@@ -56,9 +56,15 @@ Clarify scope with the user. Identify:
 #### Context7: Current Library Docs
 ```
 1. resolve-library-id for each relevant library
-2. query-docs for the specific feature/API needed
+2. get-library-docs for the specific feature/API needed
 3. Note: version-specific gotchas, recommended patterns, deprecations
 ```
+
+Usage tips:
+- Always call `resolve-library-id` first (unless you already know the `/org/project` ID)
+- Use specific topic queries — "JWT authentication middleware setup" not "auth"
+- Limit to 3 Context7 calls per question. If you can't find it after 3, move on
+- Set `tokens` parameter to the minimum needed (default 5000, min 1000)
 
 #### Serper Search: Real-World Implementations
 ```
@@ -67,12 +73,22 @@ Clarify scope with the user. Identify:
 3. Look for: blog posts with code, official guides, comparison articles
 ```
 
+Usage tips:
+- Keep queries short and specific for best results
+- Serper returns snippets, not full pages. Use Firecrawl or WebFetch to read full articles
+- Use locale parameters (`gl`, `hl`) for region-specific results
+
 #### GitHub: Analogous Codebases
 ```
 1. search-code for the pattern/API in real projects
 2. search-repositories for projects solving the same problem
 3. Look for: how production codebases structure this, common pitfalls
 ```
+
+Usage tips:
+- Filter by language when using `search_code` for higher relevance
+- Look at repos with meaningful star counts for higher-quality examples
+- Use `get_file_contents` to read specific implementation files, not just search snippets
 
 ### Step 3: Formulate Exactly 3 Approaches
 
@@ -121,3 +137,7 @@ Present all 3 approaches. State your recommendation and why. Wait for user selec
 - [ ] Each approach cites real evidence (not hypothetical)
 - [ ] Recommendation stated with reasoning
 - [ ] User selected approach before implementation began
+
+## MCP Reference
+
+See [docs/mcp-guidelines.md](../../docs/mcp-guidelines.md) for detailed usage rules, tool parameters, fallback strategies, and combination patterns for Context7, Serper, and GitHub MCPs.

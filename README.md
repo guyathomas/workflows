@@ -125,6 +125,20 @@ Fetch and follow instructions from https://raw.githubusercontent.com/obra/workfl
 - **writing-skills** - Create new skills following best practices (includes testing methodology)
 - **using-workflows** - Introduction to the skills system
 
+## MCP Server Dependencies
+
+Some skills use MCP servers to extend agent capabilities. All are optional — skills fall back to built-in tools (`WebSearch`, `WebFetch`, `gh` CLI) when MCPs are unavailable.
+
+| MCP Server | Used By | Purpose |
+|-----------|---------|---------|
+| [Context7](https://github.com/upstash/context7) | planning | Current, version-specific library documentation |
+| [Serper](https://github.com/marcopesani/mcp-server-serper) | planning | Real-time Google search for implementations and best practices |
+| [GitHub](https://github.com/github/github-mcp-server) | planning | Code search across repositories for pattern validation |
+| [Firecrawl](https://github.com/firecrawl/firecrawl-mcp-server) | research | Web scraping with JS rendering for deep content extraction |
+| [Chrome DevTools](https://github.com/nicobailon/chrome-devtools-mcp) | systematic-debugging | Browser inspection, console errors, screenshots, performance |
+
+See [docs/mcp-guidelines.md](docs/mcp-guidelines.md) for detailed usage rules, tool parameters, and combination patterns.
+
 ## Philosophy
 
 - **Test-Driven Development** - Write tests first, always

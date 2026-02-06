@@ -67,6 +67,14 @@ Tool Selection: In INIT phase, check if `firecrawl-mcp:firecrawl_scrape` is avai
 Tradeoffs:
 - `firecrawl-mcp:firecrawl_scrape`: Better content extraction, handles JS-rendered pages
 - `WebFetch`: Always available, sufficient for static pages
+
+Firecrawl usage tips:
+- Use `firecrawl_scrape` for single pages — never `firecrawl_crawl` (follows links, can exceed context limits)
+- If you need to explore a site first, use `firecrawl_map` to discover URLs, then selectively `firecrawl_scrape`
+- Be aware of context window cost — every token of scraped content counts against your limit
+- For structured data extraction (tables, specs), use `firecrawl_extract` with a JSON schema
+
+See [docs/mcp-guidelines.md](../../docs/mcp-guidelines.md) for full Firecrawl usage rules and all MCP guidelines.
 </required_tools>
 
 <state_machine>

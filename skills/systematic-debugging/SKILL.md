@@ -275,6 +275,40 @@ If systematic investigation reveals issue is truly environmental, timing-depende
 
 **But:** 95% of "no root cause" cases are incomplete investigation.
 
+## Web Application Debugging with Chrome DevTools MCP
+
+When debugging web/frontend issues, the Chrome DevTools MCP provides direct browser inspection capabilities. Use it to close the loop between code changes and runtime behavior.
+
+**Availability check:** Verify `chrome-devtools-mcp` tools are available before relying on them. If unavailable, fall back to manual browser inspection.
+
+### Debugging Workflow
+
+```
+1. list_console_messages → Read runtime errors and warnings (Phase 1: Root Cause)
+2. list_network_requests → Check for failed API calls, CORS, missing resources
+3. evaluate_script → Run diagnostic JS in page context to inspect state
+4. take_screenshot → Capture visual state for comparison
+5. [Edit source code to fix]
+6. take_screenshot → Verify fix visually (Phase 4: Verify)
+```
+
+### When to Use in Debugging
+
+| Symptom | Chrome DevTools Tool | Purpose |
+|---------|---------------------|---------|
+| Runtime error / blank page | `list_console_messages` | Read exact error and stack trace |
+| API call failing | `list_network_requests`, `get_network_request` | Inspect status codes, headers, CORS |
+| Visual regression | `take_screenshot` | Capture before/after for comparison |
+| Slow page load | `performance_start_trace` → `performance_analyze_insight` | Identify bottleneck (LCP, CLS, render-blocking) |
+| Layout broken on mobile | `resize_page` → `take_screenshot` | Test different viewport sizes |
+| Unexpected component state | `evaluate_script` | Inspect DOM, framework state, variables |
+
+### Security Note
+
+Do NOT use Chrome DevTools MCP with browser sessions containing sensitive data (banking, email, credentials). The MCP exposes browser content to the agent.
+
+See [docs/mcp-guidelines.md](../../docs/mcp-guidelines.md) for full Chrome DevTools usage rules and all MCP guidelines.
+
 ## Supporting Techniques
 
 These techniques are part of systematic debugging and available in this directory:
