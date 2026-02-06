@@ -19,14 +19,6 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/research-stop-hook.sh"
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/review-nudge-hook.sh"
-          }
-        ]
       }
     ],
     "PreToolUse": [
