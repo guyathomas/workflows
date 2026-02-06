@@ -132,8 +132,6 @@ Fetch and follow instructions from https://raw.githubusercontent.com/obra/workfl
 - **Complexity reduction** - Simplicity as primary goal
 - **Evidence over claims** - Verify before declaring success
 
-Read more: [Workflows for Claude Code](https://blog.fsck.com/2025/10/09/superpowers/)
-
 ## Contributing
 
 Skills live directly in this repository. To contribute:
