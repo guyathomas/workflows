@@ -21,7 +21,7 @@ If Workflows has helped you do stuff that makes money and you are so inclined, I
 
 Thanks! 
 
-- Jesse
+- Guy
 
 
 ## Installation
