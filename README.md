@@ -119,7 +119,7 @@ Fetch and follow instructions from https://raw.githubusercontent.com/obra/workfl
 - **subagent-driven-development** - Fast iteration with two-stage review (spec compliance, then code quality)
 
 **Research**
-- **research** - Deep research with source gate enforcement. Decomposes topics into questions, researches in parallel with subagents, requires minimum source count before synthesis. Use `/research [topic]` to start.
+- **research** - Deep research with source gate enforcement. Decomposes topics into questions, researches in parallel via agent teams, requires minimum source count before synthesis. Use `/research [topic]` to start.
 
 **Meta**
 - **writing-skills** - Create new skills following best practices (includes testing methodology)

@@ -1,10 +1,10 @@
 ---
 name: code-review-pipeline
-description: Dispatches parallel code reviewers on your git diff, aggregates findings by severity, and fixes critical/high issues. Run after implementing a feature or before committing.
+description: Creates an agent team of parallel code reviewers on your git diff, aggregates findings by severity, and fixes critical/high issues. Run after implementing a feature or before committing.
 ---
 
 <objective>
-Orchestrate parallel code review across multiple specialist agents. Read the git diff, determine which reviewers to dispatch based on file types, run them concurrently, aggregate findings, filter low-confidence noise, and act on results.
+Orchestrate parallel code review using an agent team of specialist reviewers. Read the git diff, determine which reviewers to spawn as teammates based on file types, run them concurrently, aggregate findings, filter low-confidence noise, and act on results.
 </objective>
 
 <quick_start>
@@ -44,16 +44,11 @@ Don't use when:
 </phase>
 
 <phase name="DISPATCH">
-Dispatch reviewers in parallel using the Task tool. Each reviewer is an agent (subagent_type from the agents/ directory).
-
-For EACH reviewer, construct a prompt that includes:
-1. The full git diff
-2. The list of files relevant to that reviewer
-3. Instructions to return JSON in the standard output format
+Create an agent team to run specialist reviewers in parallel. Each reviewer runs as an independent teammate with its own context window.
 
 **Dispatch map:**
 
-| Category | Agent | Condition |
+| Category | Teammate role | Condition |
 |---|---|---|
 | implementation | `implementation-reviewer` | Always |
 | test | `test-reviewer` | Source files (not just tests) changed |
@@ -61,12 +56,18 @@ For EACH reviewer, construct a prompt that includes:
 | tech-practices | `tech-practices-reviewer` | Framework-specific files in diff |
 | ui | `ui-reviewer` | UI component files in diff |
 
-Launch all applicable reviewers as parallel Task calls in a single message. Use `model: sonnet` for each.
+Spawn all applicable reviewers as teammates in a single request. Use Sonnet for each teammate.
 
-**Prompt template for each reviewer:**
+For EACH teammate, provide:
+1. The reviewer role name (from the dispatch map)
+2. The full git diff
+3. The list of files relevant to that reviewer
+4. Instructions to return JSON in the standard output format
+
+**Instructions for each teammate:**
 
 ```
-Review the following code changes. Return your findings as JSON.
+You are a {reviewer-role} teammate. Review the following code changes. Return your findings as JSON.
 
 ## Changed files
 {file_list}
@@ -74,10 +75,12 @@ Review the following code changes. Return your findings as JSON.
 ## Diff
 {diff_content}
 ```
+
+Wait for all teammates to complete their reviews before proceeding to AGGREGATE.
 </phase>
 
 <phase name="AGGREGATE">
-1. Collect JSON responses from all reviewers
+1. Collect JSON responses from all reviewer teammates
 2. Parse each response (if malformed, skip with warning)
 3. **Filter:** Remove findings with `confidence < 80`
 4. **Deduplicate:** If multiple reviewers flag the same file:line, keep the higher-confidence finding
@@ -132,8 +135,8 @@ If no findings above confidence threshold: report "Review complete — no issues
 <error_handling>
 | Error | Action |
 |---|---|
-| Reviewer returns malformed JSON | Log warning, continue with other reviewers |
-| Reviewer times out | Log warning, continue with other reviewers |
+| Teammate returns malformed JSON | Log warning, continue with other teammates |
+| Teammate times out | Log warning, continue with other teammates |
 | No git diff available | Report "No changes to review" and stop |
-| All reviewers fail | Report error, suggest running individual reviewer manually |
+| All teammates fail | Report error, suggest running individual reviewer manually |
 </error_handling>

@@ -101,13 +101,13 @@ generate_report() {
 
     # Read state values
     local topic target_sources sources_gathered total_searches
-    local subagent_calls iteration start_time findings_count
+    local teammate_completions iteration start_time findings_count
 
     topic=$(jq -r '.topic // "Unknown"' "$state_file")
     target_sources=$(jq -r '.targetSources // 0' "$state_file")
     sources_gathered=$(jq -r '.sourcesGathered // 0' "$state_file")
     total_searches=$(jq -r '.totalSearches // 0' "$state_file")
-    subagent_calls=$(jq -r '.subagentCalls // 0' "$state_file")
+    teammate_completions=$(jq -r '.teammateCompletions // .subagentCalls // 0' "$state_file")
     iteration=$(jq -r '.iteration // 0' "$state_file")
     start_time=$(jq -r '.startTime // null' "$state_file")
     findings_count=$(jq -r '.findingsCount // 0' "$state_file")
@@ -134,7 +134,7 @@ Research complete: "${topic}"
 Resources used:
   Searches:     ${total_searches}
   Sources:      ${sources_gathered}/${target_sources} target
-  Subagents:    ${subagent_calls}
+  Teammates:    ${teammate_completions}
   Iterations:   ${iteration}
   Duration:     ${duration}
   Findings:     ${findings_count}
@@ -150,7 +150,7 @@ Research cancelled: "${topic}"
 Progress:
   Searches:     ${total_searches}
   Sources:      ${sources_gathered}/${target_sources} target (${percentage}%)
-  Subagents:    ${subagent_calls}
+  Teammates:    ${teammate_completions}
   Iterations:   ${iteration}
   Duration:     ${duration}
   Findings:     ${findings_count}
