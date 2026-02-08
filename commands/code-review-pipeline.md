@@ -1,5 +1,5 @@
 ---
-description: "Run the full multi-agent code review pipeline on your changes. Dispatches parallel reviewers, aggregates findings, and fixes critical issues."
+description: "Run the full code review pipeline on your changes. Creates an agent team of parallel reviewers, aggregates findings, and fixes critical issues."
 argument-hint: "[optional focus area or notes]"
 ---
 

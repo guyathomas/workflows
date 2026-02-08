@@ -1,12 +1,12 @@
 ---
 name: research
-description: Use when user explicitly requests deep research or comprehensive analysis requiring 20+ authoritative sources. Dispatches subagents for parallel research with source gate enforcement, confidence tracking, and structured synthesis. NOT for simple questions answerable with a single search.
+description: Use when user explicitly requests deep research or comprehensive analysis requiring 20+ authoritative sources. Creates an agent team for parallel research with source gate enforcement, confidence tracking, and structured synthesis. NOT for simple questions answerable with a single search.
 ---
 
 <objective>
-Comprehensive research using subagents, web search, and web scraping. Iteratively decomposes topics, gathers evidence from quality sources, and synthesizes findings into structured reports.
+Comprehensive research using an agent team, web search, and web scraping. Iteratively decomposes topics, gathers evidence from quality sources via parallel researcher teammates, and synthesizes findings into structured reports.
 
-Core principle: Decompose questions, research in parallel with subagents, evaluate confidence, iterate until sufficient, synthesize with source attribution.
+Core principle: Decompose questions, research in parallel with an agent team, evaluate confidence, iterate until sufficient, synthesize with source attribution.
 </objective>
 
 <quick_start>
@@ -55,12 +55,14 @@ Don't use when:
 </when_to_use>
 
 <required_tools>
-| Tool | Purpose | Required |
+| Tool / Feature | Purpose | Required |
 |------|---------|----------|
 | `WebSearch` | Search queries (built-in) | Yes |
-| `Task` | Spawn research subagents | Yes |
+| Agent teams | Spawn parallel researcher teammates | Yes |
 | `firecrawl-mcp:firecrawl_scrape` | Scrape full page content (preferred) | No |
 | `WebFetch` | Fetch page content (built-in fallback) | Fallback |
+
+**Prerequisite:** Agent teams must be enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings or environment).
 
 Tool Selection: In INIT phase, check if `firecrawl-mcp:firecrawl_scrape` is available. If not, use `WebFetch` (built-in). Record choice in `state.json` as `"scraper": "firecrawl"` or `"scraper": "webfetch"`.
 
@@ -84,7 +86,7 @@ State File: `research/{slug}/state.json`
   "targetSources": 30,
   "sourcesGathered": 0,
   "totalSearches": 0,
-  "subagentCalls": 0,
+  "teammateCompletions": 0,
   "findingsCount": 0,
   "startTime": "ISO-8601 timestamp",
   "scraper": "firecrawl|webfetch",
@@ -160,7 +162,7 @@ On skill invocation, first check for existing state:
      "targetSources": 30,
      "sourcesGathered": 0,
      "totalSearches": 0,
-     "subagentCalls": 0,
+     "teammateCompletions": 0,
      "findingsCount": 0,
      "startTime": "2024-01-15T10:30:00Z",
      "scraper": "firecrawl|webfetch",
@@ -192,12 +194,12 @@ Add questions to `state.json` with `status="pending"`. Set `phase="RESEARCH"`.
 </phase>
 
 <phase name="RESEARCH">
-Batch pending questions (max 3 at a time). For each, dispatch a subagent.
+Create an agent team to research pending questions in parallel. Spawn one teammate per pending question (up to 8 teammates at a time). Each teammate works independently with its own context window.
 
-Read `scraper` from state.json and use the appropriate prompt:
+Read `scraper` from state.json and use the appropriate instructions when spawning each teammate:
 
-<subagent_prompt scraper="firecrawl">
-You are a research subagent with access to `WebSearch` and `firecrawl-mcp:firecrawl_scrape`.
+<teammate_instructions scraper="firecrawl">
+You are a researcher teammate with access to `WebSearch` and `firecrawl-mcp:firecrawl_scrape`.
 
 **TASK:** {QUESTION}
 
@@ -220,10 +222,10 @@ You are a research subagent with access to `WebSearch` and `firecrawl-mcp:firecr
 4. Use `firecrawl-mcp:firecrawl_scrape` on each. Continue if one fails.
 
 5. Extract specific facts with sources.
-</subagent_prompt>
+</teammate_instructions>
 
-<subagent_prompt scraper="webfetch">
-You are a research subagent with access to `WebSearch` and `WebFetch`.
+<teammate_instructions scraper="webfetch">
+You are a researcher teammate with access to `WebSearch` and `WebFetch`.
 
 **TASK:** {QUESTION}
 
@@ -246,9 +248,9 @@ You are a research subagent with access to `WebSearch` and `WebFetch`.
 4. Use `WebFetch` on each with a prompt like "Extract the main content and key facts from this page". Continue if one fails.
 
 5. Extract specific facts with sources.
-</subagent_prompt>
+</teammate_instructions>
 
-<subagent_return_format>
+<teammate_return_format>
 **RETURN ONLY THIS JSON:**
 ```json
 {
@@ -265,20 +267,20 @@ You are a research subagent with access to `WebSearch` and `WebFetch`.
   "confidenceReason": "..."
 }
 ```
-</subagent_return_format>
+</teammate_return_format>
 
-After each subagent response:
+After each teammate completes:
 1. Validate JSON. Retry once if malformed.
 2. Append to `findings.json`
 3. Update `state.json`:
    - Mark question done
    - Increment `totalSearches` by `searchesRun` from response
-   - Increment `subagentCalls` by 1
+   - Increment `teammateCompletions` by 1
    - Increment `sourcesGathered` by `urlsScraped` from response
    - Increment `findingsCount` by length of `findings` array from response
 4. Log progress: `"Sources: {sourcesGathered}/{targetSources}"`
 
-After batch: Set `phase="EVALUATE"`.
+After all teammates complete: Set `phase="EVALUATE"`.
 </phase>
 
 <phase name="EVALUATE">
@@ -359,7 +361,7 @@ Write `report.md`:
 [Tier 2-3 sources with URLs]
 
 ---
-*Sources: {sourcesGathered} | Searches: {totalSearches} | Subagents: {subagentCalls} | Iterations: {iteration} | Duration: {duration} | Date: {date}*
+*Sources: {sourcesGathered} | Searches: {totalSearches} | Teammates: {teammateCompletions} | Iterations: {iteration} | Duration: {duration} | Date: {date}*
 ```
 
 Set `phase="DONE"`.
@@ -383,8 +385,8 @@ On completion: The Stop hook will display a resource usage summary when you exit
 | Resource | Default | Notes |
 |----------|---------|-------|
 | Target sources | 30 | Adjustable in INIT (20-40 based on complexity) |
-| Subagents per batch | 3 | Parallel research questions |
-| URLs per subagent | 4 | Sources scraped per question |
+| Teammates per batch | 8 | Parallel research questions (one teammate per question) |
+| URLs per teammate | 4 | Sources scraped per question |
 | Follow-ups per iteration | 4 | New questions from gaps |
 
 No hard iteration or search limits. The source gate is the primary constraint. Research continues until `sourcesGathered >= targetSources`.
