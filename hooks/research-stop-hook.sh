@@ -197,7 +197,13 @@ main() {
         # Generate cancellation report and allow exit
         local report
         report=$(generate_report "$state_file" "$findings_file" "cancelled")
-        echo "$report"
+        local escaped_report
+        escaped_report=$(escape_for_json "$report")
+        cat <<EOF
+{
+    "systemMessage": "${escaped_report}"
+}
+EOF
         exit 0
     fi
 
@@ -226,7 +232,13 @@ main() {
             # Generate completion report and allow exit
             local report
             report=$(generate_report "$state_file" "$findings_file" "complete")
-            echo "$report"
+            local escaped_report
+            escaped_report=$(escape_for_json "$report")
+            cat <<EOF
+{
+    "systemMessage": "${escaped_report}"
+}
+EOF
             exit 0
         fi
 
