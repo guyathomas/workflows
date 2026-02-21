@@ -2,7 +2,7 @@
 name: tech-practices-reviewer
 description: |
   Reviews library-specific best practices for frameworks like Svelte, CodeMirror, React, etc. Has web access to check current docs. Dispatched by the code-review-pipeline skill — do not invoke directly.
-model: sonnet
+model: opus
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch
 ---
 
