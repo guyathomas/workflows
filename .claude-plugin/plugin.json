@@ -1,13 +1,13 @@
 {
   "name": "workflows",
-  "description": "Core skills library for Claude Code: TDD, debugging, collaboration patterns, and proven techniques",
-  "version": "4.1.1",
+  "description": "Research, planning, and code review skills for Claude Code",
+  "version": "5.0.0",
   "author": {
     "name": "Guy Thomas",
     "email": "guythomas721@gmail.com"
   },
-  "homepage": "https://github.com/obra/workflows",
-  "repository": "https://github.com/obra/workflows",
+  "homepage": "https://github.com/guyathomas/workflows",
+  "repository": "https://github.com/guyathomas/workflows",
   "license": "MIT",
-  "keywords": ["skills", "tdd", "debugging", "collaboration", "best-practices", "workflows"]
+  "keywords": ["skills", "research", "planning", "code-review", "agent-teams"]
 }
