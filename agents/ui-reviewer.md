@@ -2,7 +2,7 @@
 name: ui-reviewer
 description: |
   Reviews UI components for WCAG accessibility and UX usability. Checks keyboard navigation, ARIA, interaction patterns, loading/error states. Dispatched by the code-review-pipeline skill — do not invoke directly.
-model: sonnet
+model: opus
 tools: Read, Glob, Grep, Bash
 ---
 

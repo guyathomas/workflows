@@ -2,7 +2,7 @@
 name: architecture-reviewer
 description: |
   Reviews structural integrity, pattern consistency, and coupling in code changes. Dispatched by the code-review-pipeline skill when new/moved files or structural changes are detected — do not invoke directly.
-model: sonnet
+model: opus
 tools: Read, Glob, Grep, Bash
 ---
 

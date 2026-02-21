@@ -2,7 +2,7 @@
 name: test-reviewer
 description: |
   Reviews test quality, identifies coverage gaps, and flags test antipatterns. Returns list of missing tests. Dispatched by the code-review-pipeline skill — do not invoke directly.
-model: sonnet
+model: opus
 tools: Read, Glob, Grep, Bash
 ---
 

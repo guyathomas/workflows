@@ -2,7 +2,7 @@
 name: implementation-reviewer
 description: |
   Reviews code for bugs, logic errors, error handling gaps, and security vulnerabilities. Returns confidence-scored findings. Dispatched by the code-review-pipeline skill — do not invoke directly.
-model: sonnet
+model: opus
 tools: Read, Glob, Grep, Bash
 ---
 

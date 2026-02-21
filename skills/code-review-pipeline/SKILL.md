@@ -58,19 +58,18 @@ Create an agent team to run specialist reviewers in parallel. Each reviewer runs
 
 **Step 1 — Launch Codex background reviews:**
 
-Before spawning teammates, write the diff to a temp file and launch Codex reviews as background processes for each reviewer type in the dispatch set:
+Before spawning teammates, launch Codex reviews as background processes for each reviewer type in the dispatch set:
 
 ```bash
-git diff HEAD > /tmp/review-diff.patch
 # For each reviewer type (e.g., implementation, test, architecture):
-./scripts/codex-review.sh {type}-reviewer /tmp/review-diff.patch /tmp/codex-{type}.json &
+./scripts/codex-domain-review.sh <domain> /tmp/codex-<domain>-$$.json &
 ```
 
-If `codex` is not installed, skip silently — the script exits cleanly. These run in the background alongside the Claude agent team with no added latency.
+The script runs `git diff main` internally — no diff file or file list needed. If `codex` is not installed, the script writes a skip-marker and exits cleanly. These run in the background alongside the Claude agent team with no added latency.
 
 **Step 2 — Spawn Claude agent teammates:**
 
-Spawn all applicable reviewers as teammates in a single request. Use Sonnet for each teammate.
+Spawn all applicable reviewers as teammates in a single request. Use Opus for each teammate.
 
 For EACH teammate, provide:
 1. The reviewer role name (from the dispatch map)
@@ -90,25 +89,29 @@ You are a {reviewer-role} teammate. Review the following code changes. Return yo
 {diff_content}
 ```
 
-Wait for all teammates to complete their reviews before proceeding to AGGREGATE.
+**Step 3 — Wait for all:**
+
+1. `wait` for all background codex processes to finish
+2. Wait for Claude teammates to complete (may already be done)
 </phase>
 
 <phase name="AGGREGATE">
-1. Collect JSON responses from all Claude reviewer teammates, tag each finding with `"source": "claude"`
-2. For each dispatched reviewer type, check if `/tmp/codex-{type}.json` exists:
-   - If it exists, parse the JSON array of findings (already tagged `"source": "codex"`)
-   - If missing or malformed, log a warning and continue without it
-3. Merge Claude and Codex findings into a single list
+1. Collect JSON responses from all reviewer teammates (Claude agents)
+2. Collect JSON output files from all codex reviews (`/tmp/codex-<domain>-$$.json`)
+   - Skip any file whose summary starts with "skipped" (codex unavailable/timed out)
+3. Merge all findings into a single array
 4. Parse each response (if malformed, skip with warning)
 5. **Filter:** Remove findings with `confidence < 80`
-6. **Deduplicate:** If multiple reviewers flag the same file:line, keep the higher-confidence finding. If a Claude and Codex finding match the same file:line, set `"source": "claude+codex"`
-7. **Group by severity:**
+6. **Cross-validate:** If a Claude reviewer AND a Codex reviewer both flag the same file:line (within 3 lines), mark those findings as `"crossValidated": true` — this is a strong signal
+7. **Deduplicate:** If multiple reviewers flag the same file:line with the same issue, keep the higher-confidence finding but preserve the cross-validated flag
+8. **Group by severity:**
    - **Critical** — Must fix before proceeding
    - **High** — Should fix now
    - **Medium** — Suggestions worth considering
    - **Low** — Minor improvements
 
-8. **Compile missing tests** list from all reviewers
+9. **Compile missing tests** list from all reviewers
+10. **Cleanup:** Remove temp files (`/tmp/codex-*-$$.json`)
 </phase>
 
 <phase name="ACT">
@@ -127,18 +130,23 @@ Report as suggestions in a summary table:
 ## Review Summary
 
 **Reviewers:** implementation, test, ui
+**Codex reviewers:** codex-implementation, codex-test, codex-ui
 **Files reviewed:** 5
-**Findings:** 2 critical, 1 high, 3 medium, 1 low
+**Findings:** 2 critical, 1 high, 3 medium, 1 low (1 cross-validated)
+
+### Cross-Validated (flagged by both Claude and Codex)
+- [critical] src/auth.ts:42 — SQL injection via string interpolation (implementation-reviewer + codex-implementation)
 
 ### Fixed (Critical/High)
-- [critical] src/auth.ts:42 — SQL injection via string interpolation → switched to parameterized query (claude+codex)
-- [high] src/api.ts:15 — Uncaught promise rejection → added try/catch (claude)
+- [critical] src/auth.ts:42 — SQL injection via string interpolation → switched to parameterized query
+- [high] src/api.ts:15 — Uncaught promise rejection → added try/catch
 
 ### Suggestions (Medium/Low)
-| Severity | File | Line | Issue | Recommendation | Source |
+| Severity | Agent | File | Line | Issue | Recommendation |
 |---|---|---|---|---|---|
-| medium | src/utils.ts | 23 | Potential null dereference | Add null check before access | claude |
-| low | src/config.ts | 8 | Magic number | Extract to named constant | codex |
+| medium | implementation-reviewer | src/utils.ts | 23 | Potential null dereference | Add null check before access |
+| medium | codex-implementation | src/utils.ts | 25 | Missing boundary check | Validate input range |
+| low | codex-architecture | src/config.ts | 8 | Magic number | Extract to named constant |
 
 ### Missing Tests
 - Test error path when fetchUser throws in src/auth.ts:42
@@ -146,12 +154,6 @@ Report as suggestions in a summary table:
 ```
 
 If no findings above confidence threshold: report "Review complete — no issues found."
-
-### Cleanup
-Remove temp files created during the pipeline:
-```bash
-rm -f /tmp/review-diff.patch /tmp/codex-*.json
-```
 </phase>
 
 </workflow>
@@ -163,7 +165,7 @@ rm -f /tmp/review-diff.patch /tmp/codex-*.json
 | Teammate times out | Log warning, continue with other teammates |
 | No git diff available | Report "No changes to review" and stop |
 | All teammates fail | Report error, suggest running individual reviewer manually |
-| `codex` not installed | Skip codex reviews, proceed Claude-only |
-| Codex process fails or times out | Skip that reviewer's codex output |
-| Codex returns non-JSON | Log warning, skip that codex output |
+| Codex CLI not available | Script writes skip-marker JSON, pipeline proceeds Claude-only |
+| Codex returns malformed JSON | Script wraps raw output, AGGREGATE skips with warning |
+| Codex hangs | `timeout 120` kills process, script writes skip-marker JSON |
 </error_handling>
