@@ -1,6 +1,6 @@
 # Workflows
 
-Research, planning, and code review skills for Claude Code, plus Codex review scripts.
+Research, planning, and code review skills for Claude Code.
 
 ## What's Included
 
@@ -14,13 +14,11 @@ Research, planning, and code review skills for Claude Code, plus Codex review sc
 
 Specialized reviewers for the code-review-pipeline: architecture, code, implementation, tech practices, tests, and UI.
 
-### Commands (10)
+### Commands (8)
 
 - `/research` — Start a deep research session
 - `/code-review-pipeline` — Run the full review pipeline
 - `/review-architecture`, `/review-code`, `/review-implementation`, `/review-tech-practices`, `/review-tests`, `/review-ui` — Individual review commands
-- `/codex-plan-review` — Review an implementation plan using Codex CLI
-- `/codex-implement` — Implement from a plan + review file using Codex CLI
 
 ### Hooks
 
@@ -28,11 +26,6 @@ Specialized reviewers for the code-review-pipeline: architecture, code, implemen
 - **research-stop-hook** — Validates research output format
 - **pre-commit-quality-gate** — Runs quality checks before commits
 - **review-nudge-hook** — Reminds to run code review after implementation
-
-### Codex Review Scripts
-
-- `scripts/codex-plan-review.sh` — Sends a plan to Codex for structured review
-- `scripts/codex-implement-from-review.sh` — Implements a plan incorporating review feedback via Codex
 
 ### AGENTS.md Template
 
@@ -56,13 +49,6 @@ A comprehensive `AGENTS.md` / `CLAUDE.md` template covering project setup, decis
 /help
 # Should list /workflows:research, /workflows:code-review-pipeline, etc.
 ```
-
-## Codex Review Workflow
-
-1. Write an implementation plan (e.g., `PLAN.md`)
-2. Run `/codex-plan-review PLAN.md` — Codex reviews the plan and writes `PLAN_REVIEW.md`
-3. Review the risks and edge cases
-4. Run `/codex-implement PLAN.md PLAN_REVIEW.md` — Codex implements incorporating review feedback
 
 ## License
 

@@ -20,7 +20,7 @@ cat <<EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "<EXTREMELY_IMPORTANT>\nYou have workflows. Use the Skill tool to invoke any skill BEFORE responding.\n\n**Available skills:**\n- **planning** — Use before implementing non-trivial features (researches approaches with Context7, Serper, GitHub MCPs)\n- **research** — Use for deep research requiring 20+ sources with confidence tracking (uses agent teams)\n- **code-review-pipeline** — Use after implementing features to catch bugs, a11y issues, and missing tests (uses agent teams)\n\n**Codex review commands:**\n- **/codex-plan-review** — Review an implementation plan using Codex CLI\n- **/codex-implement** — Implement from a plan and review file using Codex CLI\n\nIf there is a reasonable chance (20%+) a skill applies, invoke it.${warning_escaped}\n</EXTREMELY_IMPORTANT>"
+    "additionalContext": "<EXTREMELY_IMPORTANT>\nYou have workflows. Use the Skill tool to invoke any skill BEFORE responding.\n\n**Available skills:**\n- **planning** — Use before implementing non-trivial features (researches approaches with Context7, Serper, GitHub MCPs)\n- **research** — Use for deep research requiring 20+ sources with confidence tracking (uses agent teams)\n- **code-review-pipeline** — Use after implementing features to catch bugs, a11y issues, and missing tests (uses agent teams, with parallel Codex reviews when available)\n\nIf there is a reasonable chance (20%+) a skill applies, invoke it.${warning_escaped}\n</EXTREMELY_IMPORTANT>"
   }
 }
 EOF
