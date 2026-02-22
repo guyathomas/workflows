@@ -87,6 +87,7 @@ State File: `research/{slug}/state.json`
   "sourcesGathered": 0,
   "totalSearches": 0,
   "teammateCompletions": 0,
+  "codexCompletions": 0,
   "findingsCount": 0,
   "startTime": "ISO-8601 timestamp",
   "scraper": "firecrawl|webfetch",
@@ -163,6 +164,7 @@ On skill invocation, first check for existing state:
      "sourcesGathered": 0,
      "totalSearches": 0,
      "teammateCompletions": 0,
+     "codexCompletions": 0,
      "findingsCount": 0,
      "startTime": "2024-01-15T10:30:00Z",
      "scraper": "firecrawl|webfetch",
@@ -194,9 +196,21 @@ Add questions to `state.json` with `status="pending"`. Set `phase="RESEARCH"`.
 </phase>
 
 <phase name="RESEARCH">
-Create an agent team to research pending questions in parallel. Spawn one teammate per pending question (up to 8 teammates at a time). Each teammate works independently with its own context window.
+Create an agent team to research pending questions in parallel. For each pending question, spawn both a Claude teammate AND a Codex background job.
 
-Read `scraper` from state.json and use the appropriate instructions when spawning each teammate:
+**Claude teammates:** One per pending question (up to 8 at a time). Each works independently with its own context window.
+
+**Codex background jobs:** For each pending question, write a prompt file and launch via `run-engine.sh`:
+
+```bash
+# For each question:
+# 1. Write prompt to research/{slug}/codex-q{id}-prompt.txt
+# 2. Launch: ./scripts/run-engine.sh codex research/{slug}/codex-q{id}-prompt.txt research/{slug}/codex-q{id}.json --timeout 120 &
+```
+
+The Codex prompt should contain the question text and instruct Codex to return the same JSON format as the teammate return format below. Codex cannot use WebSearch — its answers come from training data, providing a different perspective for cross-validation.
+
+Read `scraper` from state.json and use the appropriate instructions when spawning each Claude teammate:
 
 <teammate_instructions scraper="firecrawl">
 You are a researcher teammate with access to `WebSearch` and `firecrawl-mcp:firecrawl_scrape`.
@@ -269,7 +283,7 @@ You are a researcher teammate with access to `WebSearch` and `WebFetch`.
 ```
 </teammate_return_format>
 
-After each teammate completes:
+After each Claude teammate completes:
 1. Validate JSON. Retry once if malformed.
 2. Append to `findings.json`
 3. Update `state.json`:
@@ -280,7 +294,17 @@ After each teammate completes:
    - Increment `findingsCount` by length of `findings` array from response
 4. Log progress: `"Sources: {sourcesGathered}/{targetSources}"`
 
-After all teammates complete: Set `phase="EVALUATE"`.
+After all Claude teammates AND Codex background jobs complete:
+1. `wait` for all background Codex processes
+2. Read each `research/{slug}/codex-q{id}.json` — skip any with `status` starting with `"skipped"`
+3. Increment `codexCompletions` in `state.json` for each non-skipped result
+4. **Spawn the `synthesizer` agent in research mode.** Provide:
+   - All Claude teammate findings from `findings.json`
+   - All Codex results from `research/{slug}/codex-q{id}.json`
+   - Instructions to operate in `research` mode
+5. The synthesizer will cross-validate facts, flag Codex-only claims as hypotheses, and return merged findings
+6. Write synthesizer output to `research/{slug}/synthesis.json` (keep original `findings.json` intact for report generation)
+7. Set `phase="EVALUATE"`
 </phase>
 
 <phase name="EVALUATE">
