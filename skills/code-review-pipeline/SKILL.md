@@ -56,6 +56,12 @@ Create an agent team to run specialist reviewers in parallel. Each reviewer runs
 | tech-practices | `tech-practices-reviewer` | Framework-specific files in diff |
 | ui | `ui-reviewer` | UI component files in diff |
 
+**Step 0 — Pre-flight check:**
+
+Check if `codex` CLI is available (`command -v codex`). Output a status line:
+- If available: `"Dispatching reviewers: {list}. Codex detected — launching parallel dual reviews."`
+- If not: `"Dispatching reviewers: {list}. Codex not available — Claude-only reviews."`
+
 **Step 1 — Launch Codex background reviews:**
 
 Before spawning teammates, launch Codex reviews as background processes for each reviewer type in the dispatch set:
@@ -93,6 +99,9 @@ You are a {reviewer-role} teammate. Review the following code changes. Return yo
 
 1. `wait` for all background codex processes to finish
 2. Wait for Claude teammates to complete (may already be done)
+3. For each Codex output file, read the `summary` field. Report a single status line:
+   `"Codex results: implementation ✓  test ✓  ui ⏭ (timed out)"`
+   Use ✓ for completed, ⏭ for skipped/timed out.
 </phase>
 
 <phase name="AGGREGATE">
@@ -129,10 +138,11 @@ Report as suggestions in a summary table:
 ```
 ## Review Summary
 
-**Reviewers:** implementation, test, ui
-**Codex reviewers:** codex-implementation, codex-test, codex-ui
+**Claude reviewers:** implementation, test, ui (Opus)
+**Codex reviewers:** codex-implementation ✓, codex-test ✓, codex-ui ⏭
 **Files reviewed:** 5
-**Findings:** 2 critical, 1 high, 3 medium, 1 low (1 cross-validated)
+**Findings:** 2 critical, 1 high, 3 medium, 1 low
+**Cross-validated:** 1 finding confirmed by both engines
 
 ### Cross-Validated (flagged by both Claude and Codex)
 - [critical] src/auth.ts:42 — SQL injection via string interpolation (implementation-reviewer + codex-implementation)
