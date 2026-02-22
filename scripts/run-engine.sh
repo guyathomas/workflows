@@ -41,6 +41,31 @@ marker() {
     '{engine: $engine, status: $status, output: null}' > "$OUT_FILE"
 }
 
+# Cross-platform timeout: GNU timeout > gtimeout (Homebrew coreutils) > perl fallback
+TIMEOUT_CMD=""
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT_CMD="timeout"
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT_CMD="gtimeout"
+fi
+
+run_with_timeout() {
+  if [[ -n "$TIMEOUT_CMD" ]]; then
+    "$TIMEOUT_CMD" "$TIMEOUT" "$@"
+  else
+    # POSIX fallback using perl alarm
+    perl -e '
+      $SIG{ALRM} = sub { kill "TERM", $pid; exit 124 };
+      alarm $ARGV[0];
+      $pid = fork // die "fork: $!";
+      if ($pid == 0) { exec @ARGV[1..$#ARGV] or die "exec: $!" }
+      waitpid($pid, 0);
+      alarm 0;
+      exit ($? >> 8);
+    ' "$TIMEOUT" "$@"
+  fi
+}
+
 # Ensure output directory exists
 mkdir -p "$(dirname "$OUT_FILE")"
 
@@ -60,7 +85,7 @@ command -v "$ENGINE" >/dev/null 2>&1 || {
 rc=0
 case "$ENGINE" in
   codex)
-    timeout "$TIMEOUT" codex exec \
+    run_with_timeout codex exec \
       --skip-git-repo-check \
       --sandbox workspace-write \
       --config sandbox_workspace_write.network_access=true \
