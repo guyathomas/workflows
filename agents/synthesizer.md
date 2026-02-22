@@ -1,5 +1,5 @@
 ---
-name: synthesizer
+name: core:synthesizer
 description: Cross-engine synthesis agent. Reads outputs from Claude and Codex engines, cross-validates findings, and produces a merged result. Operates in three modes — review, research, or planning.
 model: opus
 tools: Read, Glob, Grep, Bash

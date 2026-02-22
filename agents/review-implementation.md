@@ -1,5 +1,5 @@
 ---
-name: implementation-reviewer
+name: core:review-implementation
 description: |
   Reviews code for bugs, logic errors, error handling gaps, and security vulnerabilities. Returns confidence-scored findings. Dispatched by the code-review-pipeline skill — do not invoke directly.
 model: opus

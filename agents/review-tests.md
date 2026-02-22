@@ -1,5 +1,5 @@
 ---
-name: test-reviewer
+name: core:review-tests
 description: |
   Reviews test quality, identifies coverage gaps, and flags test antipatterns. Returns list of missing tests. Dispatched by the code-review-pipeline skill — do not invoke directly.
 model: opus

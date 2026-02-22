@@ -1,5 +1,5 @@
 ---
-name: architecture-reviewer
+name: core:review-architecture
 description: |
   Reviews structural integrity, pattern consistency, and coupling in code changes. Dispatched by the code-review-pipeline skill when new/moved files or structural changes are detected — do not invoke directly.
 model: opus

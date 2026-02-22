@@ -1,5 +1,5 @@
 ---
-name: ui-reviewer
+name: core:review-ui
 description: |
   Reviews UI components for WCAG accessibility and UX usability. Checks keyboard navigation, ARIA, interaction patterns, loading/error states. Dispatched by the code-review-pipeline skill — do not invoke directly.
 model: opus
