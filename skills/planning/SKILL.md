@@ -145,6 +145,10 @@ Update `state.json` with `phase: "FORMULATE"`.
 
 Dual-engine evaluation of the formulated approaches. This phase runs Claude and Codex in parallel to cross-validate feasibility assessments.
 
+**Pre-flight:** Check if `codex` CLI is available (`command -v codex`). Output a status line:
+- If available: `"Codex detected — launching parallel evaluation."`
+- If not: `"Codex not available — Claude-only evaluation."`
+
 **Step 1 — Claude evaluation:**
 
 Spawn a Claude agent (Opus) to evaluate `approaches.json` against the project context. The agent reads:
@@ -183,7 +187,7 @@ The prompt instructs Codex to return the same evaluation JSON format with `"engi
 
 **Step 3 — Synthesize:**
 
-After both complete, spawn the `synthesizer` agent in **planning mode**. Provide:
+After both complete, spawn the `core:synthesizer` agent in **planning mode**. Provide:
 - `plans/{slug}/claude-eval.json`
 - `plans/{slug}/codex-eval.json`
 - Instructions to operate in `planning` mode
@@ -193,6 +197,8 @@ The synthesizer will:
 - Classify agreement/disagreement on preferred approach
 - Merge unique risks and strengths from each engine
 - Return merged evaluation with recommendation confidence
+
+Report Codex result status: `"Codex evaluation: ✓"` or `"Codex evaluation: ⏭ (timed out)"`
 
 Write synthesizer output to `plans/{slug}/synthesis.json`.
 
@@ -215,7 +221,7 @@ Record the user's choice:
 
 ## Plan-to-Review Linkage
 
-The `code-reviewer` agent can read `plans/{slug}/approaches.json` and `state.json` to validate that implementation matches the selected approach. When running code review after a planned feature, reference the plan directory.
+The `core:review-code` agent can read `plans/{slug}/approaches.json` and `state.json` to validate that implementation matches the selected approach. When running code review after a planned feature, reference the plan directory.
 
 ## Red Flags
 

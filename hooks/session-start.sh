@@ -3,6 +3,13 @@
 
 set -euo pipefail
 
+# Detect Codex availability
+if command -v codex &>/dev/null; then
+    engine_status="**Engines:** Claude + Codex (dual-engine mode)"
+else
+    engine_status="**Engines:** Claude only (install Codex for dual-engine cross-validation)"
+fi
+
 # Check if legacy skills directory exists and build warning
 warning_message=""
 legacy_skills_dir="${HOME}/.config/workflows/skills"
@@ -20,7 +27,7 @@ cat <<EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "<EXTREMELY_IMPORTANT>\nYou have workflows. Use the Skill tool to invoke any skill BEFORE responding.\n\n**Available skills:**\n- **planning** — Use before implementing non-trivial features (researches approaches with Context7, Serper, GitHub MCPs)\n- **research** — Use for deep research requiring 20+ sources with confidence tracking (uses agent teams)\n- **code-review-pipeline** — Use after implementing features to catch bugs, a11y issues, and missing tests (uses agent teams, with parallel Codex reviews when available)\n\nIf there is a reasonable chance (20%+) a skill applies, invoke it.${warning_escaped}\n</EXTREMELY_IMPORTANT>"
+    "additionalContext": "<EXTREMELY_IMPORTANT>\nYou have workflows. Use the Skill tool to invoke any skill BEFORE responding.\n\n${engine_status}\n\n**Available skills:**\n- **planning** — Use before implementing non-trivial features (researches approaches with Context7, Serper, GitHub MCPs)\n- **research** — Use for deep research requiring 20+ sources with confidence tracking (uses agent teams)\n- **review** — Use after implementing features to catch bugs, a11y issues, and missing tests (uses agent teams)\n\nIf there is a reasonable chance (20%+) a skill applies, invoke it.${warning_escaped}\n</EXTREMELY_IMPORTANT>"
   }
 }
 EOF

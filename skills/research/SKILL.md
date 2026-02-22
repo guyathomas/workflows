@@ -196,6 +196,10 @@ Add questions to `state.json` with `status="pending"`. Set `phase="RESEARCH"`.
 </phase>
 
 <phase name="RESEARCH">
+**Pre-flight:** Check if `codex` CLI is available (`command -v codex`). Output a status line:
+- If available: `"Codex detected — launching parallel background validation."`
+- If not: `"Codex not available — Claude-only research."`
+
 Create an agent team to research pending questions in parallel. For each pending question, spawn both a Claude teammate AND a Codex background job.
 
 **Claude teammates:** One per pending question (up to 8 at a time). Each works independently with its own context window.
@@ -298,7 +302,10 @@ After all Claude teammates AND Codex background jobs complete:
 1. `wait` for all background Codex processes
 2. Read each `research/{slug}/codex-q{id}.json` — skip any with `status` starting with `"skipped"`
 3. Increment `codexCompletions` in `state.json` for each non-skipped result
-4. **Spawn the `synthesizer` agent in research mode.** Provide:
+4. Report a single Codex results status line:
+   `"Codex results: q1 ✓  q2 ✓  q3 ⏭ (timed out)"`
+   Use ✓ for completed, ⏭ for skipped/timed out.
+5. **Spawn the `core:synthesizer` agent in research mode.** Provide:
    - All Claude teammate findings from `findings.json`
    - All Codex results from `research/{slug}/codex-q{id}.json`
    - Instructions to operate in `research` mode

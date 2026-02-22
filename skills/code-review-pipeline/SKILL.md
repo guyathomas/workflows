@@ -1,5 +1,5 @@
 ---
-name: code-review-pipeline
+name: review
 description: Creates an agent team of parallel code reviewers on your git diff, aggregates findings by severity, and fixes critical/high issues. Run after implementing a feature or before committing.
 ---
 
@@ -50,11 +50,11 @@ Create an agent team to run specialist reviewers in parallel. Each reviewer runs
 
 | Category | Teammate role | Condition |
 |---|---|---|
-| implementation | `implementation-reviewer` | Always |
-| test | `test-reviewer` | Source files (not just tests) changed |
-| architecture | `architecture-reviewer` | New/moved files, or changed exports detected |
-| tech-practices | `tech-practices-reviewer` | Framework-specific files in diff |
-| ui | `ui-reviewer` | UI component files in diff |
+| implementation | `core:review-implementation` | Always |
+| test | `core:review-tests` | Source files (not just tests) changed |
+| architecture | `core:review-architecture` | New/moved files, or changed exports detected |
+| tech-practices | `core:review-tech-practices` | Framework-specific files in diff |
+| ui | `core:review-ui` | UI component files in diff |
 
 **Step 0 — Pre-flight check:**
 
@@ -113,7 +113,7 @@ You are a {reviewer-role} teammate. Review the following code changes. Return yo
    - Skip any file whose `status` or `summary` starts with `"skipped"` (codex unavailable/timed out)
 3. Parse each response (if malformed, skip with warning)
 4. **Filter:** Remove findings with `confidence < 80`
-5. **Synthesize:** Spawn the `synthesizer` agent in **review mode**. Provide:
+5. **Synthesize:** Spawn the `core:synthesizer` agent in **review mode**. Provide:
    - All Claude findings (with `engine: "claude"` tags)
    - All Codex findings (with `engine: "codex"` tags)
    - Instructions to operate in `review` mode
