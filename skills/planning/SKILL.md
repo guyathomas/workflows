@@ -1,15 +1,15 @@
 ---
 name: planning
-description: Use before implementing any non-trivial feature - validates approaches against real sources using Context7, Serper, and GitHub MCPs before committing to an implementation
+description: Use before implementing any non-trivial feature - validates approaches against real sources using Context7, Serper, and GitHub MCPs, evaluates with dual engines, before committing to an implementation
 ---
 
 # Planning
 
 ## Overview
 
-Research-first planning. Validate approaches against real documentation, real codebases, and real implementations before writing code.
+Research-first planning. Validate approaches against real documentation, real codebases, and real implementations before writing code. Dual-engine evaluation cross-validates feasibility.
 
-**Core principle:** No implementation without evidence-backed approach selection.
+**Core principle:** No implementation without evidence-backed, cross-validated approach selection.
 
 **Announce at start:** "I'm using the planning skill to research approaches before implementation."
 
@@ -22,34 +22,61 @@ Research-first planning. Validate approaches against real documentation, real co
 
 **Don't use for:** Single-line fixes, obvious bugs, tasks with explicit instructions.
 
+## State Persistence
+
+All planning artifacts are persisted to enable plan-to-review linkage:
+
+```
+plans/{slug}/
+  state.json          # phase, timestamp, selected approach
+  approaches.json     # the 3 approaches with evidence
+  claude-eval.json    # Claude's evaluation
+  codex-eval.json     # Codex's evaluation (or skip marker)
+  synthesis.json      # synthesizer output
+```
+
+Generate slug from feature name: lowercase, hyphens for spaces, strip special chars, truncate to 50 chars.
+
+**state.json:**
+```json
+{
+  "feature": "description",
+  "phase": "UNDERSTAND|RESEARCH|FORMULATE|EVALUATE|PRESENT|SELECTED",
+  "timestamp": "ISO-8601",
+  "selectedApproach": null
+}
+```
+
 ## The Process
 
 ```dot
 digraph planning {
     rankdir=TB;
-    "Understand requirements" [shape=box];
-    "Research with MCPs" [shape=box];
-    "Formulate 3 approaches" [shape=box];
-    "Present to user with evidence" [shape=box];
-    "User selects approach" [shape=diamond];
-    "Proceed with implementation" [shape=box];
+    "UNDERSTAND" [shape=box];
+    "RESEARCH" [shape=box];
+    "FORMULATE" [shape=box];
+    "EVALUATE" [shape=box, style=bold];
+    "PRESENT" [shape=box];
+    "SELECTED" [shape=diamond];
 
-    "Understand requirements" -> "Research with MCPs";
-    "Research with MCPs" -> "Formulate 3 approaches";
-    "Formulate 3 approaches" -> "Present to user with evidence";
-    "Present to user with evidence" -> "User selects approach";
-    "User selects approach" -> "Proceed with implementation";
+    "UNDERSTAND" -> "RESEARCH";
+    "RESEARCH" -> "FORMULATE";
+    "FORMULATE" -> "EVALUATE";
+    "EVALUATE" -> "PRESENT";
+    "PRESENT" -> "SELECTED";
 }
 ```
 
-### Step 1: Understand Requirements
+### UNDERSTAND
 
 Clarify scope with the user. Identify:
 - What the feature needs to do
 - Constraints (performance, compatibility, existing patterns)
 - Technologies already in use
 
-### Step 2: Research with MCPs
+Create `plans/{slug}/` directory and initialize `state.json` with `phase: "UNDERSTAND"`.
+
+### RESEARCH
 
 **All three sources are REQUIRED. Do them in parallel using subagents.**
 
@@ -74,9 +101,11 @@ Clarify scope with the user. Identify:
 3. Look for: how production codebases structure this, common pitfalls
 ```
 
-### Step 3: Formulate Exactly 3 Approaches
+Update `state.json` with `phase: "RESEARCH"`.
 
-For each approach, provide:
+### FORMULATE
+
+Formulate exactly 3 approaches. For each approach, provide:
 
 ```
 ### Approach N: [Name]
@@ -96,9 +125,97 @@ For each approach, provide:
 **Fits this project because:** [why this works for the specific codebase]
 ```
 
-### Step 4: Present and Get Decision
+Write `plans/{slug}/approaches.json`:
+```json
+[
+  {
+    "index": 1,
+    "name": "Approach Name",
+    "howItWorks": "description",
+    "evidence": { "context7": "...", "serper": "...", "github": "..." },
+    "tradeoffs": { "pros": ["..."], "cons": ["..."] },
+    "fitReason": "..."
+  }
+]
+```
 
-Present all 3 approaches. State your recommendation and why. Wait for user selection before writing any code.
+Update `state.json` with `phase: "FORMULATE"`.
+
+### EVALUATE
+
+Dual-engine evaluation of the formulated approaches. This phase runs Claude and Codex in parallel to cross-validate feasibility assessments.
+
+**Step 1 — Claude evaluation:**
+
+Spawn a Claude agent (Opus) to evaluate `approaches.json` against the project context. The agent reads:
+- `plans/{slug}/approaches.json`
+- Relevant project files (package.json, existing architecture, etc.)
+
+Returns evaluation as JSON:
+```json
+{
+  "engine": "claude",
+  "evaluations": [
+    {
+      "approachIndex": 1,
+      "feasibility": "high|medium|low",
+      "risks": ["risk 1", "risk 2"],
+      "strengths": ["strength 1"],
+      "implementationNotes": "specific details"
+    }
+  ],
+  "preferredApproach": 1,
+  "reason": "why this approach is best"
+}
+```
+
+Write to `plans/{slug}/claude-eval.json`.
+
+**Step 2 — Codex evaluation (background):**
+
+Write a prompt file containing `approaches.json` content + project context, then launch:
+
+```bash
+./scripts/run-engine.sh codex plans/{slug}/codex-eval-prompt.txt plans/{slug}/codex-eval.json --timeout 120 &
+```
+
+The prompt instructs Codex to return the same evaluation JSON format with `"engine": "codex"`.
+
+**Step 3 — Synthesize:**
+
+After both complete, spawn the `synthesizer` agent in **planning mode**. Provide:
+- `plans/{slug}/claude-eval.json`
+- `plans/{slug}/codex-eval.json`
+- Instructions to operate in `planning` mode
+
+The synthesizer will:
+- Compare evaluations by approach index
+- Classify agreement/disagreement on preferred approach
+- Merge unique risks and strengths from each engine
+- Return merged evaluation with recommendation confidence
+
+Write synthesizer output to `plans/{slug}/synthesis.json`.
+
+Update `state.json` with `phase: "EVALUATE"`.
+
+### PRESENT
+
+Present all 3 approaches to the user with:
+1. The original evidence from RESEARCH
+2. The cross-validated evaluation from EVALUATE (synthesis.json)
+3. Highlight where engines agreed (strong signal) or disagreed (flag for human decision)
+
+State your recommendation, incorporating synthesis confidence. Wait for user selection before writing any code.
+
+### SELECTED
+
+Record the user's choice:
+- Update `state.json` with `phase: "SELECTED"` and `selectedApproach: N`
+- Proceed with implementation
+
+## Plan-to-Review Linkage
+
+The `code-reviewer` agent can read `plans/{slug}/approaches.json` and `state.json` to validate that implementation matches the selected approach. When running code review after a planned feature, reference the plan directory.
 
 ## Red Flags
 
@@ -108,16 +225,25 @@ Present all 3 approaches. State your recommendation and why. Wait for user selec
 - Start implementation before user selects an approach
 - Present fewer than 3 or more than 3 approaches
 - Use only one MCP source (all three required)
+- Skip the EVALUATE phase even if Codex is unavailable (Claude-only eval still adds value)
 
 **If MCP is unavailable:**
 - Note which source is missing
 - Use WebSearch as fallback for that source
 - Still present 3 evidence-backed approaches
 
+**If Codex is unavailable:**
+- Claude-only evaluation proceeds normally
+- Synthesizer passes through Claude eval with `crossValidated: false`
+- Status message: "Codex not available — Claude-only evaluation."
+
 ## Quality Checklist
 
 - [ ] All three MCP sources consulted (Context7, Serper, GitHub)
 - [ ] Exactly 3 approaches with concrete trade-offs
 - [ ] Each approach cites real evidence (not hypothetical)
+- [ ] EVALUATE phase completed (synthesis.json exists)
+- [ ] Cross-validation results shown to user
 - [ ] Recommendation stated with reasoning
 - [ ] User selected approach before implementation began
+- [ ] `plans/{slug}/state.json` records selected approach

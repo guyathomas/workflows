@@ -64,14 +64,17 @@ Check if `codex` CLI is available (`command -v codex`). Output a status line:
 
 **Step 1 — Launch Codex background reviews:**
 
-Before spawning teammates, launch Codex reviews as background processes for each reviewer type in the dispatch set:
+Before spawning teammates, write a prompt file per reviewer domain and launch Codex via `run-engine.sh`:
 
 ```bash
-# For each reviewer type (e.g., implementation, test, architecture):
-./scripts/codex-domain-review.sh <domain> /tmp/codex-<domain>-$$.json &
+# Write the diff + domain instructions to a temp prompt file per domain:
+# /tmp/codex-prompt-<domain>-$$.txt
+
+# Then launch each:
+./scripts/run-engine.sh codex /tmp/codex-prompt-<domain>-$$.txt /tmp/codex-<domain>-$$.json --timeout 120 &
 ```
 
-The script runs `git diff main` internally — no diff file or file list needed. If `codex` is not installed, the script writes a skip-marker and exits cleanly. These run in the background alongside the Claude agent team with no added latency.
+The prompt file should contain the git diff, file list, domain focus, and JSON output format instructions (same as the teammate instructions). If `codex` is not installed, the script writes a skip-marker JSON and exits cleanly. These run in the background alongside the Claude agent team with no added latency.
 
 **Step 2 — Spawn Claude agent teammates:**
 
@@ -105,22 +108,30 @@ You are a {reviewer-role} teammate. Review the following code changes. Return yo
 </phase>
 
 <phase name="AGGREGATE">
-1. Collect JSON responses from all reviewer teammates (Claude agents)
-2. Collect JSON output files from all codex reviews (`/tmp/codex-<domain>-$$.json`)
-   - Skip any file whose summary starts with "skipped" (codex unavailable/timed out)
-3. Merge all findings into a single array
-4. Parse each response (if malformed, skip with warning)
-5. **Filter:** Remove findings with `confidence < 80`
-6. **Cross-validate:** If a Claude reviewer AND a Codex reviewer both flag the same file:line (within 3 lines), mark those findings as `"crossValidated": true` — this is a strong signal
-7. **Deduplicate:** If multiple reviewers flag the same file:line with the same issue, keep the higher-confidence finding but preserve the cross-validated flag
-8. **Group by severity:**
+1. Collect JSON responses from all reviewer teammates (Claude agents) — tag each with `"engine": "claude"`
+2. Collect JSON output files from all codex reviews (`/tmp/codex-<domain>-$$.json`) — tag each with `"engine": "codex"`
+   - Skip any file whose `status` or `summary` starts with `"skipped"` (codex unavailable/timed out)
+3. Parse each response (if malformed, skip with warning)
+4. **Filter:** Remove findings with `confidence < 80`
+5. **Synthesize:** Spawn the `synthesizer` agent in **review mode**. Provide:
+   - All Claude findings (with `engine: "claude"` tags)
+   - All Codex findings (with `engine: "codex"` tags)
+   - Instructions to operate in `review` mode
+
+   The synthesizer will:
+   - Match findings across engines by file + line(+/-3) + issue similarity
+   - Classify each as AGREE (cross-validated), CHALLENGE (severity dispute), or COMPLEMENT (single-engine)
+   - Deduplicate, boost confidence on cross-validated findings, flag severity disputes
+   - Return merged findings with `crossValidated`, `classification`, and `engines` fields
+
+6. **Group by severity** from synthesizer output:
    - **Critical** — Must fix before proceeding
    - **High** — Should fix now
    - **Medium** — Suggestions worth considering
    - **Low** — Minor improvements
 
-9. **Compile missing tests** list from all reviewers
-10. **Cleanup:** Remove temp files (`/tmp/codex-*-$$.json`)
+7. **Compile missing tests** list from synthesizer output
+8. **Cleanup:** Remove temp files (`/tmp/codex-*-$$.json`, `/tmp/codex-prompt-*-$$.txt`)
 </phase>
 
 <phase name="ACT">
@@ -175,7 +186,8 @@ If no findings above confidence threshold: report "Review complete — no issues
 | Teammate times out | Log warning, continue with other teammates |
 | No git diff available | Report "No changes to review" and stop |
 | All teammates fail | Report error, suggest running individual reviewer manually |
-| Codex CLI not available | Script writes skip-marker JSON, pipeline proceeds Claude-only |
-| Codex returns malformed JSON | Script wraps raw output, AGGREGATE skips with warning |
-| Codex hangs | `timeout 120` kills process, script writes skip-marker JSON |
+| Codex CLI not available | `run-engine.sh` writes skip-marker JSON, pipeline proceeds Claude-only |
+| Codex returns malformed JSON | `run-engine.sh` wraps raw output in error envelope, synthesizer skips with warning |
+| Codex hangs | `timeout` kills process, `run-engine.sh` writes skip-marker JSON |
+| Synthesizer fails | Fall back to inline aggregation (merge all findings, skip cross-validation) |
 </error_handling>
