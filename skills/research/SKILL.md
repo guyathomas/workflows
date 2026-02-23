@@ -212,7 +212,17 @@ Create an agent team to research pending questions in parallel. For each pending
 # 2. Launch: ./scripts/run-engine.sh codex research/{slug}/codex-q{id}-prompt.txt research/{slug}/codex-q{id}.json --timeout 120 &
 ```
 
-The Codex prompt should contain the question text and instruct Codex to return the same JSON format as the teammate return format below. Codex cannot use WebSearch — its answers come from training data, providing a different perspective for cross-validation.
+The Codex prompt should instruct Codex to research the question using web search and return the same JSON format as the teammate return format below. Codex has MCP tool access including web search — its answers provide independent redundancy for cross-validation.
+
+The prompt file should contain:
+```
+Research the following question using web search. Run at least 3 different search queries, scrape the top results, and extract specific facts with source URLs.
+
+QUESTION: {QUESTION}
+
+Return ONLY this JSON:
+{"questionId": {ID}, "questionText": "{QUESTION}", "searchQueries": [...], "searchesRun": N, "urlsScraped": N, "scrapeFailures": [], "findings": [{"fact": "...", "sourceUrl": "...", "tier": 1}], "gaps": ["..."], "contradictions": ["..."], "confidence": "high|medium|low", "confidenceReason": "..."}
+```
 
 Read `scraper` from state.json and use the appropriate instructions when spawning each Claude teammate:
 
@@ -309,7 +319,7 @@ After all Claude teammates AND Codex background jobs complete:
    - All Claude teammate findings from `findings.json`
    - All Codex results from `research/{slug}/codex-q{id}.json`
    - Instructions to operate in `research` mode
-5. The synthesizer will cross-validate facts, flag Codex-only claims as hypotheses, and return merged findings
+5. The synthesizer will cross-validate facts across both engines and return merged findings
 6. Write synthesizer output to `research/{slug}/synthesis.json` (keep original `findings.json` intact for report generation)
 7. Set `phase="EVALUATE"`
 </phase>
