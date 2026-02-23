@@ -50,8 +50,10 @@ elif command -v gtimeout >/dev/null 2>&1; then
 fi
 
 run_with_timeout() {
+  local input_file="$1"
+  shift
   if [[ -n "$TIMEOUT_CMD" ]]; then
-    "$TIMEOUT_CMD" "$TIMEOUT" "$@"
+    "$TIMEOUT_CMD" "$TIMEOUT" "$@" < "$input_file"
   else
     # POSIX fallback using perl alarm
     perl -e '
@@ -62,7 +64,7 @@ run_with_timeout() {
       waitpid($pid, 0);
       alarm 0;
       exit ($? >> 8);
-    ' "$TIMEOUT" "$@"
+    ' "$TIMEOUT" "$@" < "$input_file"
   fi
 }
 
@@ -85,12 +87,12 @@ command -v "$ENGINE" >/dev/null 2>&1 || {
 rc=0
 case "$ENGINE" in
   codex)
-    run_with_timeout codex exec \
+    run_with_timeout "$PROMPT_FILE" codex exec \
       --skip-git-repo-check \
       --sandbox workspace-write \
       --config sandbox_workspace_write.network_access=true \
       --output-last-message "$OUT_FILE" \
-      - < "$PROMPT_FILE" 2>/dev/null || rc=$?
+      - 2>/dev/null || rc=$?
     ;;
   *)
     marker "skipped — unknown engine $ENGINE"
