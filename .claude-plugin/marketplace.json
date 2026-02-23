@@ -1,15 +1,15 @@
 {
-  "name": "workflows-dev",
-  "description": "Development marketplace for Workflows core skills library",
+  "name": "amux-dev",
+  "description": "Development marketplace for Amux core skills library",
   "owner": {
     "name": "Guy Thomas",
     "email": "guythomas721@gmail.com"
   },
   "plugins": [
     {
-      "name": "workflows",
+      "name": "amux",
       "description": "Research, planning, and code review skills for Claude Code",
-      "version": "5.1.0",
+      "version": "5.2.0",
       "source": "./",
       "author": {
         "name": "Guy Thomas",

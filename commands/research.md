@@ -3,4 +3,4 @@ description: "Deep research using agent teams, web search, and scraping. Decompo
 argument-hint: "[topic to research]"
 ---
 
-Invoke the workflows:research skill for: $ARGUMENTS
+Invoke the amux:research skill for: $ARGUMENTS
