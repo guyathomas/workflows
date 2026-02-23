@@ -127,7 +127,7 @@ On skill invocation, first check for existing state:
    - Attempt repair (mark incomplete questions as pending)
 </state_recovery>
 
-<workflow>
+<steps>
 
 <phase name="INIT">
 1. Generate slug from topic:
@@ -400,7 +400,7 @@ Set `phase="DONE"`.
 On completion: The Stop hook will display a resource usage summary when you exit.
 </phase>
 
-</workflow>
+</steps>
 
 <error_handling>
 | Error | Action |

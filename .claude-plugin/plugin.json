@@ -1,13 +1,13 @@
 {
-  "name": "workflows",
+  "name": "amux",
   "description": "Research, planning, and code review skills for Claude Code",
-  "version": "5.1.0",
+  "version": "5.2.0",
   "author": {
     "name": "Guy Thomas",
     "email": "guythomas721@gmail.com"
   },
-  "homepage": "https://github.com/guyathomas/workflows",
-  "repository": "https://github.com/guyathomas/workflows",
+  "homepage": "https://github.com/guyathomas/amux",
+  "repository": "https://github.com/guyathomas/amux",
   "license": "MIT",
   "keywords": ["skills", "research", "planning", "code-review", "agent-teams"]
 }

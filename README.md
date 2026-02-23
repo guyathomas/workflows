@@ -1,4 +1,4 @@
-# Workflows
+# Amux
 
 Research, planning, and code review skills for Claude Code.
 
@@ -10,9 +10,9 @@ Research, planning, and code review skills for Claude Code.
 - **planning** — Pre-implementation planning that researches approaches using Context7, Serper, and GitHub MCPs
 - **code-review-pipeline** — Multi-reviewer code review using agent teams (architecture, code, implementation, tech practices, tests, UI)
 
-### Agents (6)
+### Agents (7)
 
-Specialized reviewers for the code-review-pipeline: architecture, code, implementation, tech practices, tests, and UI.
+Specialized reviewers for the code-review-pipeline: architecture, code, implementation, tech practices, tests, UI, and synthesizer.
 
 ### Commands (8)
 
@@ -25,7 +25,6 @@ Specialized reviewers for the code-review-pipeline: architecture, code, implemen
 - **session-start** — Announces available skills on startup
 - **research-stop-hook** — Validates research output format
 - **pre-commit-quality-gate** — Runs quality checks before commits
-- **review-nudge-hook** — Reminds to run code review after implementation
 
 ### AGENTS.md Template
 
@@ -36,18 +35,18 @@ A comprehensive `AGENTS.md` / `CLAUDE.md` template covering project setup, decis
 ### Claude Code (via Plugin Marketplace)
 
 ```bash
-/plugin marketplace add guyathomas/workflows-marketplace
+/plugin marketplace add guyathomas/amux-marketplace
 ```
 
 ```bash
-/plugin install workflows@workflows-marketplace
+/plugin install amux@amux-marketplace
 ```
 
 ### Verify
 
 ```bash
 /help
-# Should list /workflows:research, /workflows:code-review-pipeline, etc.
+# Should list /amux:research, /amux:code-review-pipeline, etc.
 ```
 
 ## License

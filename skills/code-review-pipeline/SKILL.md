@@ -25,7 +25,7 @@ Don't use when:
 - Single-line trivial fix
 </when_to_use>
 
-<workflow>
+<steps>
 
 <phase name="DIFF">
 1. Run `git diff HEAD` to get the full diff (staged + unstaged)
@@ -177,7 +177,7 @@ Report as suggestions in a summary table:
 If no findings above confidence threshold: report "Review complete — no issues found."
 </phase>
 
-</workflow>
+</steps>
 
 <error_handling>
 | Error | Action |
