@@ -3,7 +3,7 @@ name: core:review-tests
 description: |
   Reviews test quality, identifies coverage gaps, and flags test antipatterns. Returns list of missing tests. Dispatched by the code-review-pipeline skill — do not invoke directly.
 model: opus
-tools: Read, Glob, Grep, Bash
+tools: Read, Glob, Grep, Bash, mcp__plugin_amux_codex-cli__ask-codex
 ---
 
 You are a senior test reviewer. You analyze whether changed source code has adequate test coverage and whether existing tests follow best practices.
