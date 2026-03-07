@@ -8,9 +8,9 @@ Research, planning, and code review skills for Claude Code with dual-engine cros
 
 - **research** — Deep research with 20+ sources and confidence tracking, powered by agent teams with Codex cross-validation
 - **planning** — Pre-implementation planning that researches approaches using Context7, Serper, and GitHub MCPs, with dual-engine evaluation via `ask-codex`
-- **code-review-pipeline** — Multi-reviewer code review using agent teams (architecture, code, implementation, tech practices, tests, UI), each cross-validated with Codex
+- **code-review-pipeline** — Multi-reviewer code review using agent teams (architecture, implementation, tech practices, tests, UI), each cross-validated with Codex
 
-### Agents (7)
+### Agents (6)
 
 **Pipeline reviewers (5):** architecture, implementation, tech practices, tests, UI — dispatched by the code-review-pipeline skill based on file types. Each performs Claude analysis and calls `ask-codex` for Codex cross-validation.
 
