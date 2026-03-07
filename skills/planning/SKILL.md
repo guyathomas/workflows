@@ -32,7 +32,7 @@ plans/{slug}/
   approaches.json     # the 3 approaches with evidence
   claude-eval.json    # Claude's evaluation
   codex-eval.json     # Codex's evaluation (or skip marker)
-  synthesis.json      # synthesizer output
+  merged-eval.json    # merged evaluation result
 ```
 
 Generate slug from feature name: lowercase, hyphens for spaces, strip special chars, truncate to 50 chars.
@@ -74,7 +74,9 @@ Clarify scope with the user. Identify:
 - Constraints (performance, compatibility, existing patterns)
 - Technologies already in use
 
-Create `plans/{slug}/` directory and initialize `state.json` with `phase: "UNDERSTAND"`.
+Check for an existing `plans/{slug}/` directory first. If one exists with `phase: "SELECTED"`, the feature was already planned — ask the user whether to reuse the existing plan, extend it, or start fresh. If it exists with an earlier phase, offer to resume from where it left off.
+
+Create `plans/{slug}/` directory (if new) and initialize `state.json` with `phase: "UNDERSTAND"`.
 
 ### RESEARCH
 
@@ -105,7 +107,9 @@ Update `state.json` with `phase: "RESEARCH"`.
 
 ### FORMULATE
 
-Formulate exactly 3 approaches. For each approach, provide:
+Formulate exactly 3 approaches. Three is deliberate: fewer than 3 risks anchoring on one idea; more than 3 overwhelms decision-making without adding clarity. Three forces you to find a genuinely distinct middle-ground option beyond the obvious "simple vs. complex" dichotomy.
+
+For each approach, provide:
 
 ```
 ### Approach N: [Name]
@@ -143,19 +147,15 @@ Update `state.json` with `phase: "FORMULATE"`.
 
 ### EVALUATE
 
-Dual-engine evaluation of the formulated approaches. This phase runs Claude and Codex in parallel to cross-validate feasibility assessments.
-
-**Pre-flight:** Check if `codex` CLI is available (`command -v codex`). Output a status line:
-- If available: `"Codex detected — launching parallel evaluation."`
-- If not: `"Codex not available — Claude-only evaluation."`
+Dual-engine evaluation of the formulated approaches. Claude evaluates inline, then calls `ask-codex` MCP tool for Codex's perspective, and merges the results.
 
 **Step 1 — Claude evaluation:**
 
-Spawn a Claude agent (Opus) to evaluate `approaches.json` against the project context. The agent reads:
+Evaluate `approaches.json` against the project context. Read:
 - `plans/{slug}/approaches.json`
 - Relevant project files (package.json, existing architecture, etc.)
 
-Returns evaluation as JSON:
+Produce evaluation as JSON:
 ```json
 {
   "engine": "claude",
@@ -175,32 +175,64 @@ Returns evaluation as JSON:
 
 Write to `plans/{slug}/claude-eval.json`.
 
-**Step 2 — Codex evaluation (background):**
+**Step 2 — Codex evaluation via MCP:**
 
-Write a prompt file containing `approaches.json` content + project context, then launch:
+Call the `ask-codex` MCP tool with:
+- `prompt`: Include the contents of `approaches.json` and ask Codex to evaluate each approach for feasibility, risks, strengths, and implementation notes. Instruct it to return the same evaluation JSON format with `"engine": "codex"`. Use `@` file references (e.g., `@package.json`, `@tsconfig.json`) to give Codex project context.
+- `model`: `codex-5.4` (or `codex-5.3` if 5.4 unavailable — deep reasoning for architectural evaluation)
+- `sandboxMode`: `read-only`
 
-```bash
-./scripts/run-engine.sh codex plans/{slug}/codex-eval-prompt.txt plans/{slug}/codex-eval.json --timeout 120 &
+Write Codex response to `plans/{slug}/codex-eval.json`.
+
+If `ask-codex` fails or times out, write a skip marker:
+```json
+{"engine": "codex", "status": "skipped — ask-codex unavailable"}
+```
+Report: `"Codex evaluation: skipped (unavailable)"`
+
+**Step 3 — Inline merge:**
+
+Compare the two evaluations by approach index:
+
+| Pattern | Classification | Action |
+|---|---|---|
+| Both prefer same approach | **AGREE** | Strong signal. Merge rationales. |
+| Different preferred approaches | **CHALLENGE** | Surface both rationales. Flag for human decision. |
+| One engine identifies a risk/strength the other missed | **COMPLEMENT** | Merge into the approach's evaluation. |
+
+Produce merged evaluation:
+```json
+{
+  "approaches": [
+    {
+      "index": 1,
+      "name": "approach name",
+      "claudeEval": { "feasibility": "high", "risks": [], "strengths": [] },
+      "codexEval": { "feasibility": "high", "risks": [], "strengths": [] },
+      "merged": {
+        "feasibility": "high",
+        "risks": ["merged unique risks from both"],
+        "strengths": ["merged unique strengths from both"],
+        "classification": "AGREE|CHALLENGE|COMPLEMENT"
+      }
+    }
+  ],
+  "recommendation": {
+    "approachIndex": 1,
+    "confidence": "high|medium|low",
+    "reason": "Both engines agree on approach 1 due to...",
+    "dissent": null
+  },
+  "summary": {
+    "agreement": "full|partial|none",
+    "enginesUsed": ["claude", "codex"]
+  }
+}
 ```
 
-The prompt instructs Codex to return the same evaluation JSON format with `"engine": "codex"`.
+Write to `plans/{slug}/merged-eval.json`.
 
-**Step 3 — Synthesize:**
-
-After both complete, spawn the `core:synthesizer` agent in **planning mode**. Provide:
-- `plans/{slug}/claude-eval.json`
-- `plans/{slug}/codex-eval.json`
-- Instructions to operate in `planning` mode
-
-The synthesizer will:
-- Compare evaluations by approach index
-- Classify agreement/disagreement on preferred approach
-- Merge unique risks and strengths from each engine
-- Return merged evaluation with recommendation confidence
-
-Report Codex result status: `"Codex evaluation: ✓"` or `"Codex evaluation: ⏭ (timed out)"`
-
-Write synthesizer output to `plans/{slug}/synthesis.json`.
+If Codex was unavailable, pass through Claude eval with `"enginesUsed": ["claude"]` and `"confidence": "medium"` (single-engine, lower confidence).
 
 Update `state.json` with `phase: "EVALUATE"`.
 
@@ -208,7 +240,7 @@ Update `state.json` with `phase: "EVALUATE"`.
 
 Present all 3 approaches to the user with:
 1. The original evidence from RESEARCH
-2. The cross-validated evaluation from EVALUATE (synthesis.json)
+2. The cross-validated evaluation from EVALUATE (merged-eval.json)
 3. Highlight where engines agreed (strong signal) or disagreed (flag for human decision)
 
 State your recommendation, incorporating synthesis confidence. Wait for user selection before writing any code.
@@ -218,6 +250,10 @@ State your recommendation, incorporating synthesis confidence. Wait for user sel
 Record the user's choice:
 - Update `state.json` with `phase: "SELECTED"` and `selectedApproach: N`
 - Proceed with implementation
+
+## Shared Dependencies
+
+The `core:synthesizer` referenced in the EVALUATE phase is a shared agent defined in the `amux` plugin (`amux:core:synthesizer`). It operates in three modes — review, research, and planning. In planning mode, it compares evaluations by approach index and merges risks/strengths across engines.
 
 ## Plan-to-Review Linkage
 

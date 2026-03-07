@@ -196,33 +196,9 @@ Add questions to `state.json` with `status="pending"`. Set `phase="RESEARCH"`.
 </phase>
 
 <phase name="RESEARCH">
-**Pre-flight:** Check if `codex` CLI is available (`command -v codex`). Output a status line:
-- If available: `"Codex detected — launching parallel background validation."`
-- If not: `"Codex not available — Claude-only research."`
+Create an agent team to research pending questions in parallel. Each teammate independently searches with Claude AND cross-validates with Codex via the `ask-codex` MCP tool.
 
-Create an agent team to research pending questions in parallel. For each pending question, spawn both a Claude teammate AND a Codex background job.
-
-**Claude teammates:** One per pending question (up to 8 at a time). Each works independently with its own context window.
-
-**Codex background jobs:** For each pending question, write a prompt file and launch via `run-engine.sh`:
-
-```bash
-# For each question:
-# 1. Write prompt to research/{slug}/codex-q{id}-prompt.txt
-# 2. Launch: ./scripts/run-engine.sh codex research/{slug}/codex-q{id}-prompt.txt research/{slug}/codex-q{id}.json --timeout 120 &
-```
-
-The Codex prompt should instruct Codex to research the question using web search and return the same JSON format as the teammate return format below. Codex has MCP tool access including web search — its answers provide independent redundancy for cross-validation.
-
-The prompt file should contain:
-```
-Research the following question using web search. Run at least 3 different search queries, scrape the top results, and extract specific facts with source URLs.
-
-QUESTION: {QUESTION}
-
-Return ONLY this JSON:
-{"questionId": {ID}, "questionText": "{QUESTION}", "searchQueries": [...], "searchesRun": N, "urlsScraped": N, "scrapeFailures": [], "findings": [{"fact": "...", "sourceUrl": "...", "tier": 1}], "gaps": ["..."], "contradictions": ["..."], "confidence": "high|medium|low", "confidenceReason": "..."}
-```
+**Claude teammates:** One per pending question (up to 8 at a time). Each works independently with its own context window. Each teammate also calls `ask-codex` to get Codex's perspective on the same question, providing genuine cross-validation — two engines may surface different sources and perspectives.
 
 Read `scraper` from state.json and use the appropriate instructions when spawning each Claude teammate:
 
@@ -278,6 +254,25 @@ You are a researcher teammate with access to `WebSearch` and `WebFetch`.
 5. Extract specific facts with sources.
 </teammate_instructions>
 
+<teammate_codex_crossvalidation>
+## Cross-Validation with Codex
+
+After completing your web research above, call the `ask-codex` MCP tool to cross-validate your findings.
+
+Call `ask-codex` with:
+- `prompt`: "Research this question: {QUESTION}. Return findings as JSON with fields: fact, sourceNote, confidence (high/medium/low). Focus on facts you can confirm from your training data."
+- `model`: `codex-5.4` (or `codex-5.3` if 5.4 unavailable)
+- `sandboxMode`: `read-only`
+
+Compare Codex findings with your web-sourced findings:
+- **AGREE**: Both found the same fact → boost confidence, note as cross-validated
+- **CHALLENGE**: Codex contradicts a web-sourced fact → note the contradiction, keep the web-sourced version with the contradiction documented
+- **COMPLEMENT (Codex-only)**: Codex reports a fact you didn't find online → include it with `"status": "hypothesis"` since Codex cannot cite web sources
+- **COMPLEMENT (Claude-only)**: You found it but Codex didn't → keep as-is with your web source
+
+If `ask-codex` fails or times out, return your Claude-only findings. Do not block on Codex.
+</teammate_codex_crossvalidation>
+
 <teammate_return_format>
 **RETURN ONLY THIS JSON:**
 ```json
@@ -288,11 +283,21 @@ You are a researcher teammate with access to `WebSearch` and `WebFetch`.
   "searchesRun": 4,
   "urlsScraped": 4,
   "scrapeFailures": [],
-  "findings": [{"fact": "...", "sourceUrl": "...", "tier": 1}],
+  "findings": [
+    {
+      "fact": "...",
+      "sourceUrl": "...",
+      "tier": 1,
+      "crossValidated": false,
+      "engines": ["claude"],
+      "status": "confirmed|hypothesis|disputed"
+    }
+  ],
   "gaps": ["what you couldn't find"],
   "contradictions": ["X says A, Y says B"],
   "confidence": "high|medium|low",
-  "confidenceReason": "..."
+  "confidenceReason": "...",
+  "codexAvailable": true
 }
 ```
 </teammate_return_format>
@@ -306,22 +311,11 @@ After each Claude teammate completes:
    - Increment `teammateCompletions` by 1
    - Increment `sourcesGathered` by `urlsScraped` from response
    - Increment `findingsCount` by length of `findings` array from response
+   - If `codexAvailable` is true, increment `codexCompletions` by 1
 4. Log progress: `"Sources: {sourcesGathered}/{targetSources}"`
 
-After all Claude teammates AND Codex background jobs complete:
-1. `wait` for all background Codex processes
-2. Read each `research/{slug}/codex-q{id}.json` — skip any with `status` starting with `"skipped"`
-3. Increment `codexCompletions` in `state.json` for each non-skipped result
-4. Report a single Codex results status line:
-   `"Codex results: q1 ✓  q2 ✓  q3 ⏭ (timed out)"`
-   Use ✓ for completed, ⏭ for skipped/timed out.
-5. **Spawn the `core:synthesizer` agent in research mode.** Provide:
-   - All Claude teammate findings from `findings.json`
-   - All Codex results from `research/{slug}/codex-q{id}.json`
-   - Instructions to operate in `research` mode
-5. The synthesizer will cross-validate facts across both engines and return merged findings
-6. Write synthesizer output to `research/{slug}/synthesis.json` (keep original `findings.json` intact for report generation)
-7. Set `phase="EVALUATE"`
+After all teammates complete:
+1. Set `phase="EVALUATE"`
 </phase>
 
 <phase name="EVALUATE">
@@ -420,6 +414,7 @@ On completion: The Stop hook will display a resource usage summary when you exit
 | Rate limit | Wait 60s, reduce batch to 2 |
 | No results | Mark low confidence, rephrase as follow-up |
 | Tool not found | Fall back to WebFetch, update state.json |
+| `ask-codex` unavailable | Teammate returns Claude-only findings, research continues |
 </error_handling>
 
 <limits>
