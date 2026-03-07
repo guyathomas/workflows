@@ -82,7 +82,8 @@ Return ONLY this JSON (no markdown fences, no commentary):
       "category": "best-practice",
       "classification": "AGREE|CHALLENGE|COMPLEMENT",
       "crossValidated": false,
-      "engines": ["claude"]
+      "engines": ["claude"],
+      "btcaVerified": false
     }
   ],
   "missingTests": [],

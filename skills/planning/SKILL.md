@@ -100,6 +100,7 @@ If the btca MCP tools are available (`listResources`, `ask`):
 **If btca is available but no matching resources exist** and the feature involves framework patterns:
 - Identify the canonical repo URL for relevant dependencies (run `npm view {pkg} repository.url` for npm packages)
 - Suggest specific commands: `btca add -n {name} {repo-url}`
+  - For monorepos, include `--searchPath`: `btca add -n sveltekit https://github.com/sveltejs/kit --searchPath packages/kit`
 - Offer to run the commands if the user approves
 
 **If btca MCP is not configured** but the btca CLI is detected (noted in session-start):
@@ -178,7 +179,7 @@ Write `plans/{slug}/approaches.json`:
     "index": 1,
     "name": "Approach Name",
     "howItWorks": "description",
-    "evidence": { "context7": "...", "serper": "...", "github": "...", "btca": "..." },
+    "evidence": { "context7": "...", "serper": "...", "github": "...", "btca": "..." /* omit if btca not used */ },
     "tradeoffs": { "pros": ["..."], "cons": ["..."] },
     "fitReason": "..."
   }
