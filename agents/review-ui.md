@@ -39,6 +39,26 @@ You receive a git diff containing UI component files (.svelte, .tsx, .jsx, .vue,
 5. Look for missing loading/error/empty states
 6. Verify interactive elements have proper feedback
 
+## Dual-Engine Cross-Validation
+
+After completing your Claude-based review, call the `ask-codex` MCP tool for a second opinion.
+
+**Step 1 — Claude review:** Complete your review as described above.
+
+**Step 2 — Codex review:** Call `ask-codex` with:
+- `prompt`: Include the diff and file list. Ask Codex to review for WCAG accessibility (semantic HTML, ARIA, keyboard nav, contrast) and UX (loading/error/empty states, interaction feedback). Return findings as JSON with fields: `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`.
+- `model`: `codex-5.4` (or `codex-5.3` if 5.4 unavailable)
+- `sandboxMode`: `read-only`
+- Use `@` file references for changed files.
+
+**Step 3 — Merge findings:**
+- Match by `file` + `line` (within +/- 3 lines) + semantic similarity
+- **AGREE**: Both found it → `crossValidated: true`, confidence boost +10 (cap 100)
+- **CHALLENGE**: Same location, different severity → keep higher, set `severityDispute: true`
+- **COMPLEMENT**: One engine only → include with `crossValidated: false`
+
+**If `ask-codex` fails:** Return Claude-only findings with `crossValidated: false`.
+
 ## Output
 
 Return ONLY this JSON (no markdown fences, no commentary):
@@ -46,6 +66,7 @@ Return ONLY this JSON (no markdown fences, no commentary):
 ```
 {
   "agent": "ui-reviewer",
+  "engines": ["claude", "codex"],
   "filesReviewed": ["src/components/Modal.svelte"],
   "findings": [
     {
@@ -55,19 +76,13 @@ Return ONLY this JSON (no markdown fences, no commentary):
       "line": 8,
       "issue": "Modal has no focus trap — keyboard users can tab behind the overlay",
       "recommendation": "Add focus trap that cycles between first and last focusable element, restore focus on close",
-      "category": "a11y"
-    },
-    {
-      "severity": "medium",
-      "confidence": 85,
-      "file": "src/components/Modal.svelte",
-      "line": 22,
-      "issue": "No loading state while async content fetches",
-      "recommendation": "Add spinner or skeleton screen during data fetch",
-      "category": "ux"
+      "category": "a11y",
+      "classification": "AGREE|CHALLENGE|COMPLEMENT",
+      "crossValidated": true,
+      "engines": ["claude", "codex"]
     }
   ],
   "missingTests": [],
-  "summary": "1 critical a11y, 1 medium ux found"
+  "summary": "1 critical a11y found, cross-validated by both engines"
 }
 ```

@@ -29,6 +29,27 @@ You receive a git diff, changed source files, and changed test files.
 4. If no test files exist for changed source files, flag as coverage gap
 5. Check that tests actually exercise the changed code paths
 
+## Dual-Engine Cross-Validation
+
+After completing your Claude-based review, call the `ask-codex` MCP tool for a second opinion.
+
+**Step 1 — Claude review:** Complete your review as described above.
+
+**Step 2 — Codex review:** Call `ask-codex` with:
+- `prompt`: Include the diff and file list. Ask Codex to review test coverage and quality — coverage gaps, antipatterns, missing negative tests. Return findings as JSON with fields: `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`, and a `missingTests` array.
+- `model`: `codex-5.4` (or `codex-5.3` if 5.4 unavailable)
+- `sandboxMode`: `read-only`
+- Use `@` file references for changed files.
+
+**Step 3 — Merge findings:**
+- Match by `file` + `line` (within +/- 3 lines) + semantic similarity
+- **AGREE**: Both found it → `crossValidated: true`, confidence boost +10 (cap 100)
+- **CHALLENGE**: Same location, different severity → keep higher, set `severityDispute: true`
+- **COMPLEMENT**: One engine only → include with `crossValidated: false`
+- Merge `missingTests` arrays from both engines, deduplicating by semantic similarity
+
+**If `ask-codex` fails:** Return Claude-only findings with `crossValidated: false`.
+
 ## Output
 
 Return ONLY this JSON (no markdown fences, no commentary):
@@ -36,6 +57,7 @@ Return ONLY this JSON (no markdown fences, no commentary):
 ```
 {
   "agent": "test-reviewer",
+  "engines": ["claude", "codex"],
   "filesReviewed": ["src/foo.ts", "src/foo.test.ts"],
   "findings": [
     {
@@ -45,13 +67,16 @@ Return ONLY this JSON (no markdown fences, no commentary):
       "line": 42,
       "issue": "New error handling branch has no test coverage",
       "recommendation": "Add test case for when fetchUser throws NetworkError",
-      "category": "test-quality"
+      "category": "test-quality",
+      "classification": "AGREE|CHALLENGE|COMPLEMENT",
+      "crossValidated": false,
+      "engines": ["claude"]
     }
   ],
   "missingTests": [
     "Test error path when fetchUser throws NetworkError in src/foo.ts:42",
     "Test boundary condition for empty array input in src/bar.ts:15"
   ],
-  "summary": "3 coverage gaps, 1 antipattern found"
+  "summary": "3 coverage gaps found"
 }
 ```

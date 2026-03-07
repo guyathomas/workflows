@@ -3,11 +3,12 @@
 
 set -euo pipefail
 
-# Detect Codex availability
+# Detect Codex MCP availability (codex-mcp-server provides ask-codex tool)
+# Check both: MCP server configured, and codex CLI installed (required by the MCP server)
 if command -v codex &>/dev/null; then
-    engine_status="**Engines:** Claude + Codex (dual-engine mode)"
+    engine_status="**Engines:** Claude + Codex (dual-engine mode via ask-codex MCP)"
 else
-    engine_status="**Engines:** Claude only (install Codex for dual-engine cross-validation)"
+    engine_status="**Engines:** Claude only (install Codex CLI for dual-engine cross-validation: npm i -g @openai/codex)"
 fi
 
 # Check if legacy skills directory exists and build warning
@@ -17,17 +18,12 @@ if [ -d "$legacy_skills_dir" ]; then
     warning_message="\n\n<important-reminder>IN YOUR FIRST REPLY AFTER SEEING THIS MESSAGE YOU MUST TELL THE USER: **WARNING:** Amux now uses Claude Code's skills system. Custom skills in ~/.config/amux/skills will not be read. Move custom skills to ~/.claude/skills instead. To make this message go away, remove ~/.config/amux/skills</important-reminder>"
 fi
 
-# shellcheck source=../lib/escape-json.sh
-source "$(cd "$(dirname "$0")" && pwd)/../lib/escape-json.sh"
-
-warning_escaped=$(escape_for_json "$warning_message")
-
 # Output context injection as JSON with lightweight skill list
 cat <<EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "<EXTREMELY_IMPORTANT>\nYou have amux. Use the Skill tool to invoke any skill BEFORE responding.\n\n${engine_status}\n\n**Available skills:**\n- **planning** — Use before implementing non-trivial features (researches approaches with Context7, Serper, GitHub MCPs)\n- **research** — Use for deep research requiring 20+ sources with confidence tracking (uses agent teams)\n- **review** — Use after implementing features to catch bugs, a11y issues, and missing tests (uses agent teams)\n\nIf there is a reasonable chance (20%+) a skill applies, invoke it.${warning_escaped}\n</EXTREMELY_IMPORTANT>"
+    "additionalContext": "<EXTREMELY_IMPORTANT>\nYou have amux. Use the Skill tool to invoke any skill BEFORE responding.\n\n${engine_status}\n\n**Available skills:**\n- **planning** — Use before implementing non-trivial features (researches approaches with Context7, Serper, GitHub MCPs)\n- **research** — Use for deep research requiring 20+ sources with confidence tracking (uses agent teams)\n- **review** — Use after implementing features to catch bugs, a11y issues, and missing tests (uses agent teams)\n\nIf there is a reasonable chance (20%+) a skill applies, invoke it.${warning_message}\n</EXTREMELY_IMPORTANT>"
   }
 }
 EOF

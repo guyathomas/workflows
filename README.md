@@ -1,18 +1,20 @@
 # Amux
 
-Research, planning, and code review skills for Claude Code.
+Research, planning, and code review skills for Claude Code with dual-engine cross-validation (Claude + Codex).
 
 ## What's Included
 
 ### Skills (3)
 
-- **research** — Deep research with 20+ sources and confidence tracking, powered by agent teams
-- **planning** — Pre-implementation planning that researches approaches using Context7, Serper, and GitHub MCPs
-- **code-review-pipeline** — Multi-reviewer code review using agent teams (architecture, code, implementation, tech practices, tests, UI)
+- **research** — Deep research with 20+ sources and confidence tracking, powered by agent teams with Codex cross-validation
+- **planning** — Pre-implementation planning that researches approaches using Context7, Serper, and GitHub MCPs, with dual-engine evaluation via `ask-codex`
+- **code-review-pipeline** — Multi-reviewer code review using agent teams (architecture, code, implementation, tech practices, tests, UI), each cross-validated with Codex
 
 ### Agents (7)
 
-Specialized reviewers for the code-review-pipeline: architecture, code, implementation, tech practices, tests, UI, and synthesizer.
+**Pipeline reviewers (5):** architecture, implementation, tech practices, tests, UI — dispatched by the code-review-pipeline skill based on file types. Each performs Claude analysis and calls `ask-codex` for Codex cross-validation.
+
+**Standalone reviewer (1):** code — reviews completed work against the original plan and coding standards. Invoked via `/review-code`.
 
 ### Commands (8)
 
@@ -22,13 +24,25 @@ Specialized reviewers for the code-review-pipeline: architecture, code, implemen
 
 ### Hooks
 
-- **session-start** — Announces available skills on startup
-- **research-stop-hook** — Validates research output format
+- **session-start** — Announces available skills and detects Codex availability on startup
+- **research-stop-hook** — Enforces source gate and reports resource usage on research completion
 - **pre-commit-quality-gate** — Runs quality checks before commits
 
-### AGENTS.md Template
+### Dual-Engine Architecture
 
-A comprehensive `AGENTS.md` / `CLAUDE.md` template covering project setup, decision protocol, development flow, code rules, testing, git conventions, and quality gates.
+Each reviewer agent independently:
+1. Performs Claude-based domain review
+2. Calls `ask-codex` MCP tool for Codex's perspective
+3. Merges findings with classification (AGREE/CHALLENGE/COMPLEMENT)
+4. Returns unified JSON with engine tags and cross-validation status
+
+Cross-validated findings (flagged by both engines) receive a confidence boost — these are the highest-signal issues.
+
+## Prerequisites
+
+- **Claude Code** with plugin support
+- **Codex CLI** (optional, for dual-engine mode): `npm i -g @openai/codex`
+- **codex-mcp-server** is declared as an MCP dependency and installed automatically
 
 ## Installation
 

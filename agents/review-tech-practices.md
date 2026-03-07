@@ -29,6 +29,26 @@ You receive a git diff containing technology-specific files (Svelte components, 
 4. Compare implementation against current recommended patterns
 5. Flag only substantive practice issues, not style preferences
 
+## Dual-Engine Cross-Validation
+
+After completing your Claude-based review, call the `ask-codex` MCP tool for a second opinion.
+
+**Step 1 — Claude review:** Complete your review as described above.
+
+**Step 2 — Codex review:** Call `ask-codex` with:
+- `prompt`: Include the diff and file list. Ask Codex to review for framework best practices, deprecated APIs, and performance patterns. Return findings as JSON with fields: `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`.
+- `model`: `codex-5.4` (or `codex-5.3` if 5.4 unavailable)
+- `sandboxMode`: `read-only`
+- Use `@` file references for changed files.
+
+**Step 3 — Merge findings:**
+- Match by `file` + `line` (within +/- 3 lines) + semantic similarity
+- **AGREE**: Both found it → `crossValidated: true`, confidence boost +10 (cap 100)
+- **CHALLENGE**: Same location, different severity → keep higher, set `severityDispute: true`
+- **COMPLEMENT**: One engine only → include with `crossValidated: false`
+
+**If `ask-codex` fails:** Return Claude-only findings with `crossValidated: false`.
+
 ## Output
 
 Return ONLY this JSON (no markdown fences, no commentary):
@@ -36,6 +56,7 @@ Return ONLY this JSON (no markdown fences, no commentary):
 ```
 {
   "agent": "tech-practices-reviewer",
+  "engines": ["claude", "codex"],
   "filesReviewed": ["src/components/Dialog.svelte"],
   "findings": [
     {
@@ -45,10 +66,13 @@ Return ONLY this JSON (no markdown fences, no commentary):
       "line": 15,
       "issue": "Using deprecated beforeUpdate lifecycle — replaced by $effect.pre in Svelte 5",
       "recommendation": "Migrate to $effect.pre() rune per https://svelte.dev/docs/svelte/$effect",
-      "category": "best-practice"
+      "category": "best-practice",
+      "classification": "AGREE|CHALLENGE|COMPLEMENT",
+      "crossValidated": false,
+      "engines": ["claude"]
     }
   ],
   "missingTests": [],
-  "summary": "1 deprecated API, 1 performance issue found"
+  "summary": "1 deprecated API found"
 }
 ```

@@ -243,17 +243,13 @@ Present all 3 approaches to the user with:
 2. The cross-validated evaluation from EVALUATE (merged-eval.json)
 3. Highlight where engines agreed (strong signal) or disagreed (flag for human decision)
 
-State your recommendation, incorporating synthesis confidence. Wait for user selection before writing any code.
+State your recommendation, incorporating merge confidence. Wait for user selection before writing any code.
 
 ### SELECTED
 
 Record the user's choice:
 - Update `state.json` with `phase: "SELECTED"` and `selectedApproach: N`
 - Proceed with implementation
-
-## Shared Dependencies
-
-The `core:synthesizer` referenced in the EVALUATE phase is a shared agent defined in the `amux` plugin (`amux:core:synthesizer`). It operates in three modes — review, research, and planning. In planning mode, it compares evaluations by approach index and merges risks/strengths across engines.
 
 ## Plan-to-Review Linkage
 
@@ -276,7 +272,7 @@ The `core:review-code` agent can read `plans/{slug}/approaches.json` and `state.
 
 **If Codex is unavailable:**
 - Claude-only evaluation proceeds normally
-- Synthesizer passes through Claude eval with `crossValidated: false`
+- Merged eval passes through Claude eval with `enginesUsed: ["claude"]`
 - Status message: "Codex not available — Claude-only evaluation."
 
 ## Quality Checklist
@@ -284,7 +280,7 @@ The `core:review-code` agent can read `plans/{slug}/approaches.json` and `state.
 - [ ] All three MCP sources consulted (Context7, Serper, GitHub)
 - [ ] Exactly 3 approaches with concrete trade-offs
 - [ ] Each approach cites real evidence (not hypothetical)
-- [ ] EVALUATE phase completed (synthesis.json exists)
+- [ ] EVALUATE phase completed (merged-eval.json exists)
 - [ ] Cross-validation results shown to user
 - [ ] Recommendation stated with reasoning
 - [ ] User selected approach before implementation began

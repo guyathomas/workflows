@@ -30,6 +30,26 @@ You receive a git diff with focus on new files, moved files, changed exports, an
 4. Trace import/export chains to detect coupling issues
 5. Look for structural issues that will compound over time
 
+## Dual-Engine Cross-Validation
+
+After completing your Claude-based review, call the `ask-codex` MCP tool for a second opinion.
+
+**Step 1 — Claude review:** Complete your review as described above.
+
+**Step 2 — Codex review:** Call `ask-codex` with:
+- `prompt`: Include the diff and file list. Ask Codex to review architecture — pattern consistency, coupling, cohesion, API surface. Return findings as JSON with fields: `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`.
+- `model`: `codex-5.4` (or `codex-5.3` if 5.4 unavailable)
+- `sandboxMode`: `read-only`
+- Use `@` file references for changed files.
+
+**Step 3 — Merge findings:**
+- Match by `file` + `line` (within +/- 3 lines) + semantic similarity
+- **AGREE**: Both found it → `crossValidated: true`, confidence boost +10 (cap 100)
+- **CHALLENGE**: Same location, different severity → keep higher, set `severityDispute: true`
+- **COMPLEMENT**: One engine only → include with `crossValidated: false`
+
+**If `ask-codex` fails:** Return Claude-only findings with `crossValidated: false`.
+
 ## Output
 
 Return ONLY this JSON (no markdown fences, no commentary):
@@ -37,6 +57,7 @@ Return ONLY this JSON (no markdown fences, no commentary):
 ```
 {
   "agent": "architecture-reviewer",
+  "engines": ["claude", "codex"],
   "filesReviewed": ["src/new-module/index.ts"],
   "findings": [
     {
@@ -46,7 +67,10 @@ Return ONLY this JSON (no markdown fences, no commentary):
       "line": 1,
       "issue": "New module imports directly from internal implementation of auth module",
       "recommendation": "Import from auth module's public API (auth/index.ts) instead of auth/internal/session.ts",
-      "category": "architecture"
+      "category": "architecture",
+      "classification": "AGREE|CHALLENGE|COMPLEMENT",
+      "crossValidated": false,
+      "engines": ["claude"]
     }
   ],
   "missingTests": [],
