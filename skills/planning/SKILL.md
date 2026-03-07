@@ -1,6 +1,6 @@
 ---
 name: planning
-description: Use before implementing any non-trivial feature - validates approaches against real sources using Context7, Serper, and GitHub MCPs, evaluates with dual engines, before committing to an implementation
+description: Use before implementing any non-trivial feature - validates approaches against real sources using Context7, Serper, GitHub MCPs, and optionally btca for source-level codebase research. Evaluates with dual engines before committing to an implementation
 ---
 
 # Planning
@@ -78,9 +78,36 @@ Check for an existing `plans/{slug}/` directory first. If one exists with `phase
 
 Create `plans/{slug}/` directory (if new) and initialize `state.json` with `phase: "UNDERSTAND"`.
 
+#### btca Resource Check (optional)
+
+If the btca MCP tools are available (`listResources`, `ask`):
+
+1. Call `listResources` to see what codebase resources are indexed
+2. Match resources against the project's tech stack (check `package.json`, import statements, config files)
+3. If matching resources exist, flag them in `state.json` as `"btcaResources": ["resource-name"]` for the RESEARCH phase
+
+**When btca adds value** (flag for RESEARCH):
+- Feature involves framework conventions, patterns, or architecture (routing, auth, SSR, data loading)
+- Project uses less-documented or rapidly evolving libraries
+- Project depends on internal/private codebases with no public docs
+- The question is "how should we structure X?" — not "what API does Y have?"
+
+**Skip btca when:**
+- The question is about API usage — Context7 already provides clear docs
+- Libraries are mature and well-documented (React, Express, lodash, zod)
+- No framework-level architectural decisions are involved
+
+**If btca is available but no matching resources exist** and the feature involves framework patterns:
+- Identify the canonical repo URL for relevant dependencies (run `npm view {pkg} repository.url` for npm packages)
+- Suggest specific commands: `btca add -n {name} {repo-url}`
+- Offer to run the commands if the user approves
+
+**If btca MCP is not configured** but the btca CLI is detected (noted in session-start):
+- Suggest one-time setup: `claude mcp add --transport stdio btca-local -- bunx btca mcp`
+
 ### RESEARCH
 
-**All three sources are REQUIRED. Do them in parallel using subagents.**
+**All three core sources are REQUIRED. Do them in parallel using subagents. btca is a fourth optional source when resources were flagged in UNDERSTAND.**
 
 #### Context7: Current Library Docs
 ```
@@ -103,6 +130,20 @@ Create `plans/{slug}/` directory (if new) and initialize `state.json` with `phas
 3. Look for: how production codebases structure this, common pitfalls
 ```
 
+#### btca: Source-Level Patterns (optional)
+
+Only run this subagent if `state.json` has `btcaResources` flagged from the UNDERSTAND phase.
+
+```
+1. Call btca ask with the matched resources
+2. Ask about patterns, conventions, and structure — not API signatures
+   e.g. "How does SvelteKit handle server-side authentication?"
+   NOT "What parameters does the redirect function accept?"
+3. Note: answers are grounded in actual source code, not documentation
+```
+
+If btca `ask` fails or returns no useful results, continue without it — the three core sources are sufficient.
+
 Update `state.json` with `phase: "RESEARCH"`.
 
 ### FORMULATE
@@ -120,6 +161,7 @@ For each approach, provide:
 - Context7: [what the docs say about this approach]
 - Serper: [what real-world articles recommend]
 - GitHub: [how production codebases do it]
+- btca: [what the source code reveals about patterns/structure] (if available)
 
 **Trade-offs:**
 - Pro: [concrete benefit with source]
@@ -136,7 +178,7 @@ Write `plans/{slug}/approaches.json`:
     "index": 1,
     "name": "Approach Name",
     "howItWorks": "description",
-    "evidence": { "context7": "...", "serper": "...", "github": "..." },
+    "evidence": { "context7": "...", "serper": "...", "github": "...", "btca": "..." },
     "tradeoffs": { "pros": ["..."], "cons": ["..."] },
     "fitReason": "..."
   }
@@ -277,7 +319,8 @@ The `core:review-code` agent can read `plans/{slug}/approaches.json` and `state.
 
 ## Quality Checklist
 
-- [ ] All three MCP sources consulted (Context7, Serper, GitHub)
+- [ ] All three core MCP sources consulted (Context7, Serper, GitHub)
+- [ ] btca consulted if resources were flagged in UNDERSTAND (optional)
 - [ ] Exactly 3 approaches with concrete trade-offs
 - [ ] Each approach cites real evidence (not hypothetical)
 - [ ] EVALUATE phase completed (merged-eval.json exists)
