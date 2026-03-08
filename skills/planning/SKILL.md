@@ -222,7 +222,7 @@ Write to `plans/{slug}/claude-eval.json`.
 
 Call the `ask-codex` MCP tool with:
 - `prompt`: Include the contents of `approaches.json` and ask Codex to evaluate each approach for feasibility, risks, strengths, and implementation notes. Instruct it to return the same evaluation JSON format with `"engine": "codex"`. Use `@` file references (e.g., `@package.json`, `@tsconfig.json`) to give Codex project context.
-- `model`: `codex-5.4` (or `codex-5.3` if 5.4 unavailable — deep reasoning for architectural evaluation)
+- `model`: `gpt-5-codex`
 - `sandboxMode`: `read-only`
 
 Write Codex response to `plans/{slug}/codex-eval.json`.

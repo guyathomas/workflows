@@ -37,7 +37,7 @@ After completing your Claude-based review, call the `ask-codex` MCP tool for a s
 
 **Step 2 — Codex review:** Call `ask-codex` with:
 - `prompt`: Include the diff and file list. Ask Codex to review for framework best practices, deprecated APIs, and performance patterns. Return findings as JSON with fields: `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`.
-- `model`: `codex-5.4` (or `codex-5.3` if 5.4 unavailable)
+- `model`: `gpt-5-codex`
 - `sandboxMode`: `read-only`
 - Use `@` file references for changed files.
 

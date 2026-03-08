@@ -261,7 +261,7 @@ After completing your web research above, call the `ask-codex` MCP tool to cross
 
 Call `ask-codex` with:
 - `prompt`: "Research this question: {QUESTION}. Return findings as JSON with fields: fact, sourceNote, confidence (high/medium/low). Focus on facts you can confirm from your training data."
-- `model`: `codex-5.4` (or `codex-5.3` if 5.4 unavailable)
+- `model`: `gpt-5-codex`
 - `sandboxMode`: `read-only`
 
 Compare Codex findings with your web-sourced findings:
