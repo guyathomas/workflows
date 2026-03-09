@@ -37,19 +37,26 @@ After completing your Claude-based review, call the `ask-codex` MCP tool to get 
 
 **Step 1 — Claude review:** Complete your review as described above and collect your findings.
 
-**Step 2 — Codex review:** Call `ask-codex` with:
-- `prompt`: Include the diff and file list. Ask Codex to review for the same checklist and return findings as JSON with fields: `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`.
+**Step 2 — Codex review:** Call `ask-codex` with these exact parameters:
+- `prompt`: Include the diff and file list. Ask Codex to review for the same checklist and return findings as JSON with fields: `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`. Use `@` file references for changed files — these must be repo-relative paths (e.g., `@src/auth.ts`) and rely on `workingDir` to resolve.
 - `model`: `gpt-5-codex`
 - `sandboxMode`: `read-only`
-- Use `@` file references for changed files (e.g., `@src/auth.ts`) so Codex can read full file context.
+- `workingDir`: the repository root path provided by the pipeline
+- `timeout`: 120000
 
-**Step 3 — Merge findings:** Compare your Claude findings with Codex findings:
+**Step 3 — Validate Codex response:** Before merging, confirm the response is usable. Treat ALL of the following as **Codex-unavailable** — fall back to Claude-only results:
+- Tool call throws or times out
+- Response is empty or whitespace-only
+- Response is not valid JSON matching the requested schema
+- Response contains MCP error text (e.g., `"Codex CLI Not Found"`, `"Codex Execution Error"`, `"Authentication Failed"`, `"Permission Error"`)
+
+**Step 4 — Merge findings (only if Codex returned valid JSON):** Compare your Claude findings with Codex findings:
 - Match by `file` + `line` (within +/- 3 lines) + semantic similarity of the issue
 - **AGREE**: Both engines found the same issue → set `crossValidated: true`, confidence = max(claude, codex) + 10 (cap 100)
 - **CHALLENGE**: Both found same location but differ on severity → keep higher severity, set `severityDispute: true`
 - **COMPLEMENT**: Only one engine found it → include with `crossValidated: false`
 
-**If `ask-codex` fails or times out:** Return your Claude-only findings with `crossValidated: false` on all. Do not let a Codex failure block your review.
+**If Codex is unavailable (any condition above):** Return your Claude-only findings with `crossValidated: false` on all. Do not let a Codex failure block your review.
 
 ## Output
 

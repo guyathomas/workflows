@@ -24,7 +24,7 @@ Research, planning, and code review skills for Claude Code with dual-engine cros
 
 ### Hooks
 
-- **session-start** — Announces available skills and detects Codex and btca availability on startup
+- **session-start** — Announces available skills and detects Codex CLI presence (note: CLI presence does not guarantee MCP usability)
 - **research-stop-hook** — Enforces source gate and reports resource usage on research completion
 - **pre-commit-quality-gate** — Runs quality checks before commits
 
@@ -32,11 +32,12 @@ Research, planning, and code review skills for Claude Code with dual-engine cros
 
 Each reviewer agent independently:
 1. Performs Claude-based domain review
-2. Calls `ask-codex` MCP tool for Codex's perspective
-3. Merges findings with classification (AGREE/CHALLENGE/COMPLEMENT)
-4. Returns unified JSON with engine tags and cross-validation status
+2. Calls `ask-codex` MCP tool with explicit `workingDir` (repo root) and `timeout`
+3. Validates the Codex response — empty, non-JSON, or MCP error-text responses are treated as Codex-unavailable
+4. Merges findings with classification (AGREE/CHALLENGE/COMPLEMENT) only if Codex returned valid JSON
+5. Returns unified JSON with engine tags and cross-validation status
 
-Cross-validated findings (flagged by both engines) receive a confidence boost — these are the highest-signal issues.
+Cross-validated findings (flagged by both engines) receive a confidence boost — these are the highest-signal issues. Reviewers gracefully degrade to Claude-only when Codex is unavailable or returns unusable output.
 
 ## Prerequisites
 

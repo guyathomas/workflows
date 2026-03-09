@@ -34,19 +34,26 @@ After completing your Claude-based review, call the `ask-codex` MCP tool for a s
 
 **Step 1 — Claude review:** Complete your review as described above and collect your findings.
 
-**Step 2 — Codex review:** Call `ask-codex` with:
-- `prompt`: Include the git diff and file list. Ask Codex to review for plan alignment, code quality, and architecture. Return findings as JSON with fields: `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`.
+**Step 2 — Codex review:** Call `ask-codex` with these exact parameters:
+- `prompt`: Include the git diff and file list. Ask Codex to review for plan alignment, code quality, and architecture. Return findings as JSON with fields: `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`. Use `@` file references for changed files — these must be repo-relative paths and rely on `workingDir` to resolve.
 - `model`: `gpt-5-codex`
 - `sandboxMode`: `read-only`
-- Use `@` file references for changed files.
+- `workingDir`: the repository root path provided by the pipeline
+- `timeout`: 120000
 
-**Step 3 — Merge findings:**
+**Step 3 — Validate Codex response:** Before merging, confirm the response is usable. Treat ALL of the following as **Codex-unavailable** — fall back to Claude-only results:
+- Tool call throws or times out
+- Response is empty or whitespace-only
+- Response is not valid JSON matching the requested schema
+- Response contains MCP error text (e.g., `"Codex CLI Not Found"`, `"Codex Execution Error"`, `"Authentication Failed"`, `"Permission Error"`)
+
+**Step 4 — Merge findings (only if Codex returned valid JSON):**
 - Match by `file` + `line` (within +/- 3 lines) + semantic similarity
 - **AGREE**: Both found it → `crossValidated: true`, confidence boost +10 (cap 100)
 - **CHALLENGE**: Same location, different severity → keep higher, set `severityDispute: true`
 - **COMPLEMENT**: One engine only → include with `crossValidated: false`
 
-**If `ask-codex` fails:** Return Claude-only findings with `crossValidated: false`.
+**If Codex is unavailable (any condition above):** Return Claude-only findings with `crossValidated: false`.
 
 ## Output
 

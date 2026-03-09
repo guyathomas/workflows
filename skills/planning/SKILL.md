@@ -220,14 +220,22 @@ Write to `plans/{slug}/claude-eval.json`.
 
 **Step 2 — Codex evaluation via MCP:**
 
-Call the `ask-codex` MCP tool with:
-- `prompt`: Include the contents of `approaches.json` and ask Codex to evaluate each approach for feasibility, risks, strengths, and implementation notes. Instruct it to return the same evaluation JSON format with `"engine": "codex"`. Use `@` file references (e.g., `@package.json`, `@tsconfig.json`) to give Codex project context.
+Call the `ask-codex` MCP tool with these exact parameters:
+- `prompt`: Include the contents of `approaches.json` and ask Codex to evaluate each approach for feasibility, risks, strengths, and implementation notes. Instruct it to return the same evaluation JSON format with `"engine": "codex"`. Use `@` file references (e.g., `@package.json`, `@tsconfig.json`) — these must be repo-relative paths and rely on `workingDir` to resolve.
 - `model`: `gpt-5-codex`
 - `sandboxMode`: `read-only`
+- `workingDir`: the repository root (run `git rev-parse --show-toplevel` if not already known)
+- `timeout`: 180000
 
-Write Codex response to `plans/{slug}/codex-eval.json`.
+**Validate the response before writing.** Treat ALL of the following as Codex-unavailable:
+- Tool call throws or times out
+- Response is empty or whitespace-only
+- Response is not valid JSON matching the requested schema
+- Response contains MCP error text (e.g., `"Codex CLI Not Found"`, `"Codex Execution Error"`)
 
-If `ask-codex` fails or times out, write a skip marker:
+If valid, write Codex response to `plans/{slug}/codex-eval.json`.
+
+If Codex is unavailable (any condition above), write a skip marker:
 ```json
 {"engine": "codex", "status": "skipped — ask-codex unavailable"}
 ```

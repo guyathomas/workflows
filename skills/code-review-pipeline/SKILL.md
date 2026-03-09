@@ -31,8 +31,9 @@ Don't use when:
 <phase name="DIFF">
 1. Run `git diff HEAD` to get the full diff (staged + unstaged)
 2. Run `git diff --name-only HEAD` to get the list of changed files
-3. If no code files changed, report "No code changes to review" and stop
-4. Classify changed files into categories:
+3. Determine the repository root: run `git rev-parse --show-toplevel` to get the absolute path. This is required context for all teammates.
+4. If no code files changed, report "No code changes to review" and stop
+5. Classify changed files into categories:
 
 | File pattern | Categories |
 |---|---|
@@ -65,25 +66,32 @@ For EACH teammate, provide:
 1. The reviewer role name (from the dispatch map)
 2. The full git diff
 3. The list of files relevant to that reviewer
-4. Instructions to return JSON in the standard output format
+4. The **repository root path** (from `git rev-parse --show-toplevel`)
+5. Instructions to return JSON in the standard output format
 
 **Instructions for each teammate:**
 
 ```
 You are a {reviewer-role} teammate. Review the following code changes. Return your findings as JSON.
 
+## Repository root
+{repo_root}
+
 ## Changed files
 {file_list}
 
 ## Diff
 {diff_content}
+
+When calling ask-codex, pass `workingDir: "{repo_root}"` and use repo-relative @ file references.
 ```
 
 Each teammate will:
 1. Perform their Claude-based domain review
-2. Call `ask-codex` MCP tool for Codex cross-validation
-3. Merge findings with classification (AGREE/CHALLENGE/COMPLEMENT)
-4. Return unified JSON with engine tags
+2. Call `ask-codex` MCP tool for Codex cross-validation (with `workingDir` set to the repo root)
+3. Validate the Codex response before merging — empty, non-JSON, or error-text responses mean Codex-unavailable
+4. Merge findings with classification (AGREE/CHALLENGE/COMPLEMENT) only if Codex returned valid JSON
+5. Return unified JSON with engine tags
 </phase>
 
 <phase name="AGGREGATE">
@@ -151,5 +159,6 @@ If no findings above confidence threshold: report "Review complete — no issues
 | Teammate times out | Log warning, continue with other teammates |
 | No git diff available | Report "No changes to review" and stop |
 | All teammates fail | Report error, suggest running individual reviewer manually |
-| `ask-codex` unavailable in teammate | Teammate returns Claude-only findings, pipeline continues |
+| `ask-codex` unavailable in teammate | Teammate returns Claude-only findings (`"engines": ["claude"]`), pipeline continues |
+| `ask-codex` returns empty or error text | Same as unavailable — teammate returns Claude-only findings, pipeline continues |
 </error_handling>

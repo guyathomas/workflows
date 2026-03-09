@@ -259,18 +259,25 @@ You are a researcher teammate with access to `WebSearch` and `WebFetch`.
 
 After completing your web research above, call the `ask-codex` MCP tool to cross-validate your findings.
 
-Call `ask-codex` with:
+Call `ask-codex` with these exact parameters:
 - `prompt`: "Research this question: {QUESTION}. Return findings as JSON with fields: fact, sourceNote, confidence (high/medium/low). Focus on facts you can confirm from your training data."
 - `model`: `gpt-5-codex`
 - `sandboxMode`: `read-only`
+- `timeout`: 120000
 
-Compare Codex findings with your web-sourced findings:
+**Validate the response before merging.** Treat ALL of the following as Codex-unavailable:
+- Tool call throws or times out
+- Response is empty or whitespace-only
+- Response is not valid JSON matching the requested schema
+- Response contains MCP error text (e.g., `"Codex CLI Not Found"`, `"Codex Execution Error"`)
+
+If Codex returned valid JSON, compare findings with your web-sourced findings:
 - **AGREE**: Both found the same fact → boost confidence, note as cross-validated
 - **CHALLENGE**: Codex contradicts a web-sourced fact → note the contradiction, keep the web-sourced version with the contradiction documented
 - **COMPLEMENT (Codex-only)**: Codex reports a fact you didn't find online → include it with `"status": "hypothesis"` since Codex cannot cite web sources
 - **COMPLEMENT (Claude-only)**: You found it but Codex didn't → keep as-is with your web source
 
-If `ask-codex` fails or times out, return your Claude-only findings. Do not block on Codex.
+If Codex is unavailable (any condition above), return your Claude-only findings. Do not block on Codex.
 </teammate_codex_crossvalidation>
 
 <teammate_return_format>
@@ -414,7 +421,7 @@ On completion: The Stop hook will display a resource usage summary when you exit
 | Rate limit | Wait 60s, reduce batch to 2 |
 | No results | Mark low confidence, rephrase as follow-up |
 | Tool not found | Fall back to WebFetch, update state.json |
-| `ask-codex` unavailable | Teammate returns Claude-only findings, research continues |
+| `ask-codex` unavailable, empty, or error-text response | Teammate returns Claude-only findings, research continues |
 </error_handling>
 
 <limits>

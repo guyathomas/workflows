@@ -35,7 +35,8 @@ skill (orchestrator)
 ### Files Modified
 
 #### All 6 reviewer agents (`agents/review-*.md`)
-- Add dual-engine instructions: do Claude review, call `ask-codex`, merge findings
+- Add dual-engine instructions: do Claude review, call `ask-codex` with explicit `workingDir`/`timeout`, validate response, merge findings
+- Codex-unavailable conditions: throw, timeout, empty response, non-JSON, or MCP error text
 - Add `classification`, `crossValidated`, `engines` fields to output format
 - Model selection: `o3` for implementation/security, `gpt-5-codex` for others
 
@@ -72,8 +73,8 @@ skill (orchestrator)
 
 1. **Distributed synthesis** — each teammate merges its own findings (has domain context for semantic matching)
 2. **Model selection per domain** — `o3` for deep reasoning, `gpt-5-codex` for speed
-3. **Graceful degradation** — if `ask-codex` fails, teammate returns Claude-only findings
-4. **`@` file references** — pass file paths to Codex instead of inlining content
+3. **Graceful degradation** — if `ask-codex` throws, times out, returns empty/non-JSON, or returns MCP error text, teammate returns Claude-only findings
+4. **`@` file references** — pass repo-relative file paths to Codex; only reliable when `workingDir` is set to the repository root
 
 ## Output Format (per reviewer)
 
