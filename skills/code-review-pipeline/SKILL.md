@@ -42,7 +42,12 @@ Don't use when:
 | New files, moved files, changed exports | architecture |
 
 5. The `implementation` reviewer is ALWAYS dispatched
-6. Deduplicate categories into a set of reviewers to dispatch
+6. **Check for a plan:** Look for plan context to pass to the plan-adherence reviewer. Check these sources in order and use the first one found:
+   - `plans/*/state.json` with `"phase": "SELECTED"` → read the corresponding `approaches.json` for the selected approach
+   - `plan.md` or `PLAN.md` in the repo root → read the file contents
+   - Any plan context provided as an argument to the review command (e.g., `/code-review-pipeline "plan: ..."`)
+   If plan context is found, add `plan-adherence` to the category set and store the plan content to pass to the reviewer.
+7. Deduplicate categories into a set of reviewers to dispatch
 </phase>
 
 <phase name="DISPATCH">
@@ -57,6 +62,7 @@ Create an agent team to run specialist reviewers in parallel. Each reviewer runs
 | architecture | `core:review-architecture` | New/moved files, or changed exports detected |
 | tech-practices | `core:review-tech-practices` | Framework-specific files in diff |
 | ui | `core:review-ui` | UI component files in diff |
+| plan-adherence | `core:review-plan-adherence` | Plan context found (from `plans/`, `plan.md`, or arguments) |
 
 **Announce:** `"Dispatching reviewers: {list}. Each reviewer will cross-validate with Codex via ask-codex MCP tool."`
 
@@ -86,6 +92,13 @@ You are a {reviewer-role} teammate. Review the following code changes. Return yo
 When calling ask-codex, pass `workingDir: "{repo_root}"` and use repo-relative @ file references.
 ```
 
+**For the plan-adherence reviewer only**, also include:
+```
+## Plan context
+{plan_content}
+```
+Where `{plan_content}` is the plan text discovered in the DIFF phase (the selected approach JSON, markdown plan, or user-provided plan text).
+
 Each teammate will:
 1. Perform their Claude-based domain review
 2. Call `ask-codex` MCP tool for Codex cross-validation (with `workingDir` set to the repo root)
@@ -105,6 +118,7 @@ Each teammate will:
    - **Low** — Minor improvements
 5. **Highlight cross-validated findings** — findings with `crossValidated: true` are high-signal (confirmed by both Claude and Codex)
 6. **Compile missing tests** list from all teammates
+7. **Surface plan adherence** — if the plan-adherence reviewer returned `planAdherence`, include completeness score, deviation summary, and scope creep items in the report
 </phase>
 
 <phase name="ACT">
@@ -141,6 +155,15 @@ Report as suggestions in a summary table:
 | medium | implementation | src/utils.ts | 23 | Potential null dereference | Add null check | claude |
 | medium | implementation | src/utils.ts | 25 | Missing boundary check | Validate input range | codex |
 | low | architecture | src/config.ts | 8 | Magic number | Extract to named constant | claude, codex |
+
+### Plan Adherence
+**Plan:** plans/feature-slug (Approach 1: "Name")
+**Completeness:** 4/5 items implemented
+- [x] JWT authentication middleware
+- [x] Route protection
+- [ ] Token refresh endpoint (**missing**)
+**Deviations:** 1 justified (middleware instead of decorator)
+**Scope creep:** None
 
 ### Missing Tests
 - Test error path when fetchUser throws in src/auth.ts:42

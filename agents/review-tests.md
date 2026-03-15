@@ -14,6 +14,7 @@ You receive a git diff, changed source files, and changed test files.
 
 ## Review Checklist
 
+### Tier 1: Structural Analysis (what baseline review catches)
 1. **Coverage gaps** — Changed logic branches without corresponding tests, new functions without tests, modified behavior without updated tests
 2. **Test quality** — Tests that verify implementation details rather than behavior, brittle assertions, missing edge cases
 3. **Antipatterns** — Tests that pass when they shouldn't, tests with no assertions, tests that depend on execution order, excessive mocking that hides bugs
@@ -21,13 +22,41 @@ You receive a git diff, changed source files, and changed test files.
 5. **Test naming** — Names that don't describe the scenario and expected outcome
 6. **Setup/teardown** — Shared mutable state between tests, missing cleanup
 
+### Tier 2: Deep Analysis (structured techniques that require methodical reasoning)
+
+7. **Mutation survival analysis** — For each branch/conditional in changed code, mentally flip the operator (`<` to `>=`, `&&` to `||`, `===` to `!==`) or remove the branch entirely. Would any existing test fail? If no test would catch the mutation, the branch is undertested. Only flag when you can name the specific mutation and confirm no test covers it.
+
+8. **Branch-path tracing** — Enumerate every execution path through the changed code (each if/else arm, each catch block, each early return). For each path, trace whether a test forces execution through that specific path by checking the test's setup/mocks. A test that calls the function is not sufficient — it must set up conditions that force the specific branch.
+
+9. **Assertion precision scoring** — Flag assertions that are too broad to catch regressions:
+   - `toBeTruthy()`/`toBeFalsy()` when a specific value is known
+   - `toContain()` on a string when the full string is deterministic
+   - `toHaveBeenCalled()` without `toHaveBeenCalledWith()` when args matter
+   - `expect(result).toBeDefined()` when the shape/value is predictable
+   - Tautological assertions: mock returns X, test asserts result === X (only tests wiring)
+
+10. **Test isolation audit** — Check for patterns that cause order-dependent failures:
+    - Module-scope mutable variables shared across tests without `beforeEach` reset
+    - Tests that read state written by a previous test (cumulative counters, shared arrays)
+    - Global state mutations (env vars, singletons, timers) without cleanup
+    - `mockImplementation` set in one test leaking into the next
+
 ## Process
 
-1. Read each changed source file to understand what was modified
+1. Read each changed source file. **Build a branch map**: list every conditional, early return, try/catch, and loop with its line number. This is your coverage target list.
 2. Find corresponding test files (check common patterns: `*.test.*`, `*.spec.*`, `__tests__/`, `tests/`)
-3. If test files exist, evaluate their coverage of the changed code
-4. If no test files exist for changed source files, flag as coverage gap
-5. Check that tests actually exercise the changed code paths
+3. If test files exist, **map each test to the branches it exercises**. For each test, trace which branch-map entry it covers by examining its mock setup and assertions. Mark uncovered branches.
+4. If no test files exist for changed source files, flag as coverage gap.
+5. **Run mutation analysis** on uncovered or weakly-covered branches: for each, identify the simplest mutation (flip comparison, remove call, swap branches) and confirm no test would fail.
+6. **Score assertion quality**: for each test, classify assertions as precise (tests exact value/shape), adequate (tests meaningful property), or weak (tautological, too broad, or missing). Flag tests with only weak assertions.
+7. **Audit test isolation**: scan for module-scope mutable state, missing beforeEach resets, and cross-test data dependencies.
+
+### Calibration Rules
+
+- **Do not flag hypothetical edge cases that are outside the scope of the changed code.** If the code handles its documented inputs correctly and tests verify that, it is well-tested. Unicode handling, extreme string lengths, and exotic inputs are only relevant if the changed code explicitly handles (or should handle) them.
+- **Severity assignment**: `high` = a mutation would survive (changed behavior undetected) or test has zero assertions. `medium` = weak assertion quality, missing branch in non-critical path. `low` = naming, style, minor improvements.
+- **Confidence threshold**: Only report findings with confidence >= 80. If you're unsure whether a test covers a branch, read the test more carefully before flagging.
+- **Well-tested code exists.** If your branch map shows all branches covered with precise assertions, say so. An empty or short `missingTests` array is the correct output for well-tested code. Do not pad findings to appear thorough.
 
 ## Dual-Engine Cross-Validation
 
