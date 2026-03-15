@@ -42,10 +42,12 @@ Don't use when:
 | New files, moved files, changed exports | architecture |
 
 5. The `implementation` reviewer is ALWAYS dispatched
-6. **Check for a plan:** Look for plan context to pass to the plan-adherence reviewer. Check these sources in order and use the first one found:
-   - `plans/*/state.json` with `"phase": "SELECTED"` → read the corresponding `approaches.json` for the selected approach
-   - `plan.md` or `PLAN.md` in the repo root → read the file contents
-   - Any plan context provided as an argument to the review command (e.g., `/code-review-pipeline "plan: ..."`)
+6. **Check for a plan:** Look for plan context to pass to the plan-adherence reviewer. Repos accumulate multiple plans over time, so disambiguation matters — using the wrong plan produces bogus findings. Check these sources in priority order:
+   - **Explicit argument** (highest priority): If the user passed plan context as an argument (e.g., `/code-review-pipeline "plan: ..."` or a plan slug/path), use that directly. Read the file if a path was given.
+   - **Branch-matched plan**: List all `plans/*/state.json` with `"phase": "SELECTED"`. If the current git branch name contains a plan slug (e.g., branch `feat/user-auth` matches `plans/user-auth/`), use that plan. This is the most common case — branches are usually named after the feature they implement.
+   - **Diff-matched plan**: If no branch match, compare changed file paths against each selected plan's scope (read `approaches.json` to understand what each plan covers). Pick the plan whose scope best overlaps with the changed files.
+   - **`plan.md` or `PLAN.md`** in the repo root — use as fallback only if no `plans/` directory exists.
+   - If multiple plans match equally or no plan is found, do NOT guess. Skip the plan-adherence reviewer and note "Multiple plans found, pass a plan slug to disambiguate" or "No matching plan found".
    If plan context is found, add `plan-adherence` to the category set and store the plan content to pass to the reviewer.
 7. Deduplicate categories into a set of reviewers to dispatch
 </phase>
