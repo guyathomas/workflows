@@ -42,7 +42,14 @@ Don't use when:
 | New files, moved files, changed exports | architecture |
 
 5. The `implementation` reviewer is ALWAYS dispatched
-6. Deduplicate categories into a set of reviewers to dispatch
+6. **Check for a plan:** Look for plan context to pass to the plan-adherence reviewer. Repos accumulate multiple plans over time, so disambiguation matters — using the wrong plan produces bogus findings. Check these sources in priority order:
+   - **Explicit argument** (highest priority): If the user passed plan context as an argument (e.g., `/code-review-pipeline "plan: ..."` or a plan slug/path), use that directly. Read the file if a path was given.
+   - **Branch-matched plan**: List all `plans/*/state.json` with `"phase": "SELECTED"`. If the current git branch name contains a plan slug (e.g., branch `feat/user-auth` matches `plans/user-auth/`), use that plan. This is the most common case — branches are usually named after the feature they implement.
+   - **Diff-matched plan**: If no branch match, compare changed file paths against each selected plan's scope (read `approaches.json` to understand what each plan covers). Pick the plan whose scope best overlaps with the changed files.
+   - **`plan.md` or `PLAN.md`** in the repo root — use as fallback only if no `plans/` directory exists.
+   - If multiple plans match equally or no plan is found, do NOT guess. Skip the plan-adherence reviewer and note "Multiple plans found, pass a plan slug to disambiguate" or "No matching plan found".
+   If plan context is found, add `plan-adherence` to the category set and store the plan content to pass to the reviewer.
+7. Deduplicate categories into a set of reviewers to dispatch
 </phase>
 
 <phase name="DISPATCH">
@@ -57,6 +64,7 @@ Create an agent team to run specialist reviewers in parallel. Each reviewer runs
 | architecture | `core:review-architecture` | New/moved files, or changed exports detected |
 | tech-practices | `core:review-tech-practices` | Framework-specific files in diff |
 | ui | `core:review-ui` | UI component files in diff |
+| plan-adherence | `core:review-plan-adherence` | Plan context found (from `plans/`, `plan.md`, or arguments) |
 
 **Announce:** `"Dispatching reviewers: {list}. Each reviewer will cross-validate with Codex via ask-codex MCP tool."`
 
@@ -86,6 +94,13 @@ You are a {reviewer-role} teammate. Review the following code changes. Return yo
 When calling ask-codex, pass `workingDir: "{repo_root}"` and use repo-relative @ file references.
 ```
 
+**For the plan-adherence reviewer only**, also include:
+```
+## Plan context
+{plan_content}
+```
+Where `{plan_content}` is the plan text discovered in the DIFF phase (the selected approach JSON, markdown plan, or user-provided plan text).
+
 Each teammate will:
 1. Perform their Claude-based domain review
 2. Call `ask-codex` MCP tool for Codex cross-validation (with `workingDir` set to the repo root)
@@ -105,6 +120,7 @@ Each teammate will:
    - **Low** — Minor improvements
 5. **Highlight cross-validated findings** — findings with `crossValidated: true` are high-signal (confirmed by both Claude and Codex)
 6. **Compile missing tests** list from all teammates
+7. **Surface plan adherence** — if the plan-adherence reviewer returned `planAdherence`, include completeness score, deviation summary, and scope creep items in the report
 </phase>
 
 <phase name="ACT">
@@ -141,6 +157,15 @@ Report as suggestions in a summary table:
 | medium | implementation | src/utils.ts | 23 | Potential null dereference | Add null check | claude |
 | medium | implementation | src/utils.ts | 25 | Missing boundary check | Validate input range | codex |
 | low | architecture | src/config.ts | 8 | Magic number | Extract to named constant | claude, codex |
+
+### Plan Adherence
+**Plan:** plans/feature-slug (Approach 1: "Name")
+**Completeness:** 4/5 items implemented
+- [x] JWT authentication middleware
+- [x] Route protection
+- [ ] Token refresh endpoint (**missing**)
+**Deviations:** 1 justified (middleware instead of decorator)
+**Scope creep:** None
 
 ### Missing Tests
 - Test error path when fetchUser throws in src/auth.ts:42

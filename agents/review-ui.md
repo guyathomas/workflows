@@ -22,22 +22,62 @@ You receive a git diff containing UI component files (.svelte, .tsx, .jsx, .vue,
 5. **Screen reader** — Meaningful alt text, hidden decorative images, announcement of dynamic content
 6. **Motion** — Respects prefers-reduced-motion, no auto-playing animations
 
+### Deep Accessibility Analysis
+
+These checks catch issues that surface-level review misses. Apply each one explicitly.
+
+7. **Focus order vs visual order** — Trace the DOM order of interactive elements and compare to visual layout. Flag when CSS (`order`, `flex-direction: row-reverse`, `position: absolute`, `grid-area`) causes DOM-order to diverge from visual reading order. This breaks keyboard navigation (WCAG 2.4.3). Also flag `tabindex` values > 0, which override natural tab order.
+
+8. **Live region audit** — Any content that updates dynamically (toasts, notifications, inline validation, counters, chat messages, progress updates) MUST have an appropriate `aria-live` region or `role="alert"` / `role="status"`. Check:
+   - Toast/snackbar components: need `role="alert"` or `aria-live="assertive"`
+   - Form validation messages that appear on blur/submit: need `aria-live="polite"` or `role="alert"`
+   - Content loaded asynchronously into existing containers: needs `aria-live="polite"` on the container
+   - Counters/badges that update: need `aria-live="polite"`
+   - Flag `aria-live` on regions that contain large amounts of content (screen reader will re-read everything)
+
+9. **Color contrast reasoning** — Do not just flag "check contrast." When CSS defines specific colors (hex, rgb, hsl, named, CSS variables with visible defaults), reason about the actual combination:
+   - Trace `color` and `background-color` to their resolved values. Follow CSS custom properties to their definitions.
+   - Small text (<18px regular, <14px bold) requires 4.5:1. Large text requires 3:1.
+   - Check `:hover`, `:focus`, `:disabled`, `::placeholder` states — these often have reduced contrast.
+   - Flag `opacity` < 1 on text or transparent backgrounds that reduce effective contrast.
+   - Flag text over images/gradients without a fallback background color.
+
 ### UX Usability
-7. **Loading states** — Missing loading indicators, skeleton screens, or progress feedback
-8. **Error states** — Missing error messages, unhelpful error text, no recovery path
-9. **Empty states** — No guidance when data is empty, blank screens
-10. **Interaction feedback** — No visual response to clicks, missing hover/active states, disabled state clarity
-11. **Responsive** — Fixed widths, missing breakpoints, overflow issues
-12. **Touch targets** — Interactive elements smaller than 44x44px
+10. **Loading states** — Missing loading indicators, skeleton screens, or progress feedback
+11. **Error states** — Missing error messages, unhelpful error text, no recovery path
+12. **Empty states** — No guidance when data is empty, blank screens
+13. **Interaction feedback** — No visual response to clicks, missing hover/active states, disabled state clarity
+14. **Touch targets** — Interactive elements smaller than 44x44px (WCAG 2.5.8). Check explicit `width`/`height`/`padding` in CSS. Inline links in dense text also need sufficient target spacing (WCAG 2.5.5).
+
+### Deep UX Analysis
+
+15. **Cognitive load** — Flag these patterns that increase cognitive burden without mitigation:
+    - Forms with >7 visible fields without `<fieldset>`/grouping or multi-step breakdown
+    - Navigation with >2 levels of depth and no breadcrumb or "you are here" indicator
+    - Destructive actions (delete, cancel, remove, revoke) without confirmation step or undo
+    - Multiple competing calls-to-action at equal visual weight
+    - Dense data tables without sorting, filtering, or pagination
+
+16. **Responsive breakpoint analysis** — Check for:
+    - Fixed pixel `width` on containers (not `max-width`) — breaks on narrow viewports
+    - Missing `<meta name="viewport">` in HTML documents
+    - `overflow: hidden` on containers that could clip text at larger font sizes
+    - Media queries that leave gaps (e.g., styles for >768px and <480px but nothing between)
+    - Horizontal scrolling caused by elements wider than viewport (fixed widths, wide tables without scroll wrappers)
 
 ## Process
 
-1. Read each changed UI file fully
+1. Read each changed UI file fully — including associated CSS/style blocks
 2. Check HTML structure for semantic correctness
 3. Verify ARIA usage is correct and complete
 4. Check for keyboard interaction handling (onkeydown, tabindex, focus management)
-5. Look for missing loading/error/empty states
-6. Verify interactive elements have proper feedback
+5. **Focus order pass** — List interactive elements in DOM order. Compare to visual layout implied by CSS. Flag divergences.
+6. **Live region pass** — Identify every dynamic content update (fetches, timers, user actions that change visible text). Verify each has an appropriate `aria-live` or role.
+7. **Color contrast pass** — For each text-styling rule, trace `color` + `background-color` to concrete values. State the approximate contrast ratio and whether it passes for the text size.
+8. Look for missing loading/error/empty states
+9. **Cognitive load pass** — Count form fields, navigation depth, destructive actions. Flag per checklist item 15.
+10. **Responsive pass** — Scan for fixed pixel widths, missing viewport meta, overflow risks. Flag per checklist item 16.
+11. Verify interactive elements have proper feedback and touch target sizing
 
 ## Dual-Engine Cross-Validation
 
