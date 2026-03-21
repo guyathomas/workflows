@@ -25,7 +25,7 @@ Research, planning, and code review skills for Claude Code with dual-engine cros
 ### Hooks
 
 - **session-start** — Announces available skills and detects Codex CLI presence (note: CLI presence does not guarantee MCP usability)
-- **research-stop-hook** — Enforces source gate and reports resource usage on research completion
+- **task-loop-hook** — Generic task loop that blocks exit while any skill's `task-loop.json` has `complete: false`. Used by research (and available for future long-running skills).
 - **pre-commit-quality-gate** — Runs quality checks before commits
 
 ### Dual-Engine Architecture

@@ -12,14 +12,14 @@ Core principle: Decompose questions, research in parallel with an agent team, ev
 <quick_start>
 1. Run `/research [topic]` to start
 2. Research continues automatically until `targetSources` is met
-3. A Stop hook enforces the source gate—you cannot exit early
+3. A task loop hook enforces the source gate — you cannot exit early
 4. On completion, a resource usage report is displayed
 </quick_start>
 
 <success_criteria>
 Task is complete when ALL of these are true:
 - [ ] `state.json` exists with valid JSON
-- [ ] `sourcesGathered >= targetSources` (primary gate - enforced by Stop hook)
+- [ ] `sourcesGathered >= targetSources` (primary gate - enforced by task loop hook)
 - [ ] All questions marked `"done"` with confidence ratings
 - [ ] `report.md` synthesizes findings with source attribution
 - [ ] `phase` is `"DONE"` in state.json
@@ -98,16 +98,18 @@ State File: `research/{slug}/state.json`
 Rule: Read `state.json` before acting. Write `state.json` after acting.
 </state_machine>
 
-<source_gate_enforcement>
-A Stop hook prevents the session from ending until `sourcesGathered >= targetSources`. This is a hard gate—you cannot bypass it by rationalizing.
+<task_loop>
+A generic task loop hook prevents the session from ending while `task-loop.json` has `complete: false`. This is a hard gate — you cannot bypass it by rationalizing.
 
 How it works:
-1. When you try to complete, the hook checks `state.json`
-2. If sources are insufficient, exit is blocked and you're prompted to continue
-3. Once target is met AND phase is DONE, exit is allowed with a resource report
+1. When you try to exit, the hook reads `research/{slug}/task-loop.json`
+2. If `complete` is false, exit is blocked and `continuationPrompt` is re-injected
+3. Once you set `complete: true`, exit is allowed and `completionMessage` is displayed
+
+You manage `task-loop.json` alongside `state.json`. Update `statusMessage` and `continuationPrompt` as progress changes so the hook always has current context.
 
 Default target: 30 sources. Adjust in INIT phase based on topic complexity.
-</source_gate_enforcement>
+</task_loop>
 
 <state_recovery>
 On skill invocation, first check for existing state:
@@ -169,6 +171,17 @@ On skill invocation, first check for existing state:
      "startTime": "2024-01-15T10:30:00Z",
      "scraper": "firecrawl|webfetch",
      "questions": []
+   }
+   ```
+
+   task-loop.json (activates the generic task loop hook):
+   ```json
+   {
+     "active": true,
+     "complete": false,
+     "continuationPrompt": "Continue researching: {topic}. Check research/{slug}/state.json for current progress and continue the RESEARCH phase.",
+     "statusMessage": "Research in progress: {topic}\nSources: 0/{targetSources}",
+     "completionMessage": "Research complete."
    }
    ```
 
@@ -352,14 +365,15 @@ Stage 2: Quality Gate (only if Stage 1 passes)
 | Yes | SYNTHESIZE |
 | No | RESEARCH (generate follow-ups) |
 
-Note: The Stop hook enforces the source gate—you cannot exit until target is met.
+Note: The task loop hook enforces the source gate — you cannot exit until `task-loop.json` has `complete: true`.
 
 If continuing to RESEARCH:
 1. Generate max 4 follow-up questions from gaps/contradictions
 2. Add to questions with `status="pending"`
 3. Increment iteration
 4. Set `phase="RESEARCH"`
-5. Log: `"Continuing research: {sourcesGathered}/{targetSources} sources, need more to meet target"`
+5. Update `task-loop.json`: set `statusMessage` to current progress (`"Sources: {sourcesGathered}/{targetSources}"`) and `continuationPrompt` to reflect remaining work
+6. Log: `"Continuing research: {sourcesGathered}/{targetSources} sources, need more to meet target"`
 </phase>
 
 <phase name="SYNTHESIZE">
@@ -407,7 +421,16 @@ Write `report.md`:
 
 Set `phase="DONE"`.
 
-On completion: The Stop hook will display a resource usage summary when you exit.
+Update `task-loop.json`:
+```json
+{
+  "active": true,
+  "complete": true,
+  "completionMessage": "Research complete: \"{topic}\"\n\nResources used:\n  Searches: {totalSearches}\n  Sources: {sourcesGathered}/{targetSources}\n  Teammates: {teammateCompletions}\n  Iterations: {iteration}\n\nReport: research/{slug}/report.md"
+}
+```
+
+The task loop hook will display this message when the session exits.
 </phase>
 
 </steps>
@@ -439,10 +462,10 @@ STOP if you catch yourself thinking any of these:
 
 | Thought | Reality |
 |---------|---------|
-| "I have high confidence, I can skip the source target" | The Stop hook will block you. Gather the sources—it's non-negotiable. |
+| "I have high confidence, I can skip the source target" | The task loop hook will block you. Gather the sources — it's non-negotiable. |
 | "This topic is too broad for 8 questions" | Narrow the scope first. Don't start research on vague topics. |
-| "I'll just synthesize what I have" | Check `sourcesGathered >= targetSources`. If not met, you cannot proceed. |
+| "I'll just synthesize what I have" | Check `sourcesGathered >= targetSources` in state.json. If not met, you cannot proceed. |
 | "I don't need to update state.json" | You will lose track. Always read/write state.json. |
 | "All sources are equal" | Weight Tier 1 sources higher in synthesis. |
-| "I'm stuck, I'll just finish" | Narrow the scope or generate better follow-up questions. The source gate is non-negotiable. |
+| "I'm stuck, I'll just finish" | Narrow the scope or generate better follow-up questions. The task loop hook will block you. |
 </red_flags>

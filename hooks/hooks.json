@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/research-stop-hook.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/task-loop-hook.sh"
           }
         ]
       }
