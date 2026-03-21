@@ -1,7 +1,7 @@
 {
   "name": "amux",
   "description": "Research, planning, and code review skills for Claude Code",
-  "version": "6.2.0",
+  "version": "7.0.0",
   "author": {
     "name": "Guy Thomas",
     "email": "guythomas721@gmail.com"
@@ -11,9 +11,9 @@
   "license": "MIT",
   "keywords": ["skills", "research", "planning", "code-review", "agent-teams", "codex", "dual-engine"],
   "mcpServers": {
-    "codex-cli": {
-      "command": "npx",
-      "args": ["-y", "@cexll/codex-mcp-server"]
+    "codex": {
+      "command": "codex",
+      "args": ["mcp-server"]
     }
   }
 }

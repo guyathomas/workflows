@@ -4,10 +4,10 @@
 set -euo pipefail
 
 # Detect Codex CLI presence (necessary but not sufficient for dual-engine mode)
-# The codex-cli MCP server must also be configured and able to spawn codex successfully.
+# The native codex mcp-server must also be configured via plugin.json.
 # command -v only proves the binary exists in PATH — not that MCP can reach it.
 if command -v codex &>/dev/null; then
-    engine_status="**Engines:** Claude + Codex (dual-engine mode available if codex-cli MCP server is configured and can spawn Codex)"
+    engine_status="**Engines:** Claude + Codex (dual-engine mode available via native codex mcp-server)"
 else
     engine_status="**Engines:** Claude only (install Codex CLI for dual-engine cross-validation: npm i -g @openai/codex)"
 fi

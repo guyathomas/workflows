@@ -4,13 +4,13 @@ description: Creates an agent team of parallel dual-engine code reviewers on you
 ---
 
 <objective>
-Orchestrate parallel code review using an agent team of specialist reviewers. Each reviewer performs its own Claude analysis and calls `ask-codex` for cross-validation. Read the git diff, determine which reviewers to spawn as teammates based on file types, run them concurrently, aggregate findings, filter low-confidence noise, and act on results.
+Orchestrate parallel code review using an agent team of specialist reviewers. Each reviewer performs its own Claude analysis and calls `codex` for cross-validation. Read the git diff, determine which reviewers to spawn as teammates based on file types, run them concurrently, aggregate findings, filter low-confidence noise, and act on results.
 </objective>
 
 <quick_start>
 1. Run `/code-review-pipeline` after making code changes
 2. Reviewers dispatch automatically based on file types
-3. Each reviewer cross-validates findings with Codex via `ask-codex` MCP tool
+3. Each reviewer cross-validates findings with Codex via `codex` MCP tool
 4. Critical/high findings are fixed inline; medium/low reported as suggestions
 </quick_start>
 
@@ -53,7 +53,7 @@ Don't use when:
 </phase>
 
 <phase name="DISPATCH">
-Create an agent team to run specialist reviewers in parallel. Each reviewer runs as an independent teammate with its own context window. Each reviewer independently calls `ask-codex` for Codex cross-validation.
+Create an agent team to run specialist reviewers in parallel. Each reviewer runs as an independent teammate with its own context window. Each reviewer independently calls `codex` for Codex cross-validation.
 
 **Dispatch map:**
 
@@ -66,7 +66,7 @@ Create an agent team to run specialist reviewers in parallel. Each reviewer runs
 | ui | `core:review-ui` | UI component files in diff |
 | plan-adherence | `core:review-plan-adherence` | Plan context found (from `plans/`, `plan.md`, or arguments) |
 
-**Announce:** `"Dispatching reviewers: {list}. Each reviewer will cross-validate with Codex via ask-codex MCP tool."`
+**Announce:** `"Dispatching reviewers: {list}. Each reviewer will cross-validate with Codex via codex MCP tool."`
 
 Spawn all applicable reviewers as teammates in a single request. Use Opus for each teammate.
 
@@ -91,7 +91,7 @@ You are a {reviewer-role} teammate. Review the following code changes. Return yo
 ## Diff
 {diff_content}
 
-When calling ask-codex, pass `workingDir: "{repo_root}"` and use repo-relative @ file references.
+When calling the codex tool, pass `cwd: "{repo_root}"` and use repo-relative @ file references.
 ```
 
 **For the plan-adherence reviewer only**, also include:
@@ -103,7 +103,7 @@ Where `{plan_content}` is the plan text discovered in the DIFF phase (the select
 
 Each teammate will:
 1. Perform their Claude-based domain review
-2. Call `ask-codex` MCP tool for Codex cross-validation (with `workingDir` set to the repo root)
+2. Call `codex` MCP tool for Codex cross-validation (with `cwd` set to the repo root)
 3. Validate the Codex response before merging — empty, non-JSON, or error-text responses mean Codex-unavailable
 4. Merge findings with classification (AGREE/CHALLENGE/COMPLEMENT) only if Codex returned valid JSON
 5. Return unified JSON with engine tags
@@ -184,6 +184,6 @@ If no findings above confidence threshold: report "Review complete — no issues
 | Teammate times out | Log warning, continue with other teammates |
 | No git diff available | Report "No changes to review" and stop |
 | All teammates fail | Report error, suggest running individual reviewer manually |
-| `ask-codex` unavailable in teammate | Teammate returns Claude-only findings (`"engines": ["claude"]`), pipeline continues |
-| `ask-codex` returns empty or error text | Same as unavailable — teammate returns Claude-only findings, pipeline continues |
+| `codex` unavailable in teammate | Teammate returns Claude-only findings (`"engines": ["claude"]`), pipeline continues |
+| `codex` returns empty or error text | Same as unavailable — teammate returns Claude-only findings, pipeline continues |
 </error_handling>

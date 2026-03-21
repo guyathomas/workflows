@@ -196,9 +196,9 @@ Add questions to `state.json` with `status="pending"`. Set `phase="RESEARCH"`.
 </phase>
 
 <phase name="RESEARCH">
-Create an agent team to research pending questions in parallel. Each teammate independently searches with Claude AND cross-validates with Codex via the `ask-codex` MCP tool.
+Create an agent team to research pending questions in parallel. Each teammate independently searches with Claude AND cross-validates with Codex via the `codex` MCP tool.
 
-**Claude teammates:** One per pending question (up to 8 at a time). Each works independently with its own context window. Each teammate also calls `ask-codex` to get Codex's perspective on the same question, providing genuine cross-validation — two engines may surface different sources and perspectives.
+**Claude teammates:** One per pending question (up to 8 at a time). Each works independently with its own context window. Each teammate also calls the `codex` MCP tool to get Codex's perspective on the same question, providing genuine cross-validation — two engines may surface different sources and perspectives.
 
 Read `scraper` from state.json and use the appropriate instructions when spawning each Claude teammate:
 
@@ -257,13 +257,12 @@ You are a researcher teammate with access to `WebSearch` and `WebFetch`.
 <teammate_codex_crossvalidation>
 ## Cross-Validation with Codex
 
-After completing your web research above, call the `ask-codex` MCP tool to cross-validate your findings.
+After completing your web research above, call the `codex` MCP tool to cross-validate your findings.
 
-Call `ask-codex` with these exact parameters:
+Call the `codex` MCP tool with these exact parameters:
 - `prompt`: "Research this question: {QUESTION}. Return findings as JSON with fields: fact, sourceNote, confidence (high/medium/low). Focus on facts you can confirm from your training data."
 - `model`: `gpt-5-codex`
-- `sandboxMode`: `read-only`
-- `timeout`: 120000
+- `sandbox`: `read-only`
 
 **Validate the response before merging.** Treat ALL of the following as Codex-unavailable:
 - Tool call throws or times out
@@ -421,7 +420,7 @@ On completion: The Stop hook will display a resource usage summary when you exit
 | Rate limit | Wait 60s, reduce batch to 2 |
 | No results | Mark low confidence, rephrase as follow-up |
 | Tool not found | Fall back to WebFetch, update state.json |
-| `ask-codex` unavailable, empty, or error-text response | Teammate returns Claude-only findings, research continues |
+| `codex` MCP unavailable, empty, or error-text response | Teammate returns Claude-only findings, research continues |
 </error_handling>
 
 <limits>

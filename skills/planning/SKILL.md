@@ -190,7 +190,7 @@ Update `state.json` with `phase: "FORMULATE"`.
 
 ### EVALUATE
 
-Dual-engine evaluation of the formulated approaches. Claude evaluates inline, then calls `ask-codex` MCP tool for Codex's perspective, and merges the results.
+Dual-engine evaluation of the formulated approaches. Claude evaluates inline, then calls `codex` MCP tool for Codex's perspective, and merges the results.
 
 **Step 1 — Claude evaluation:**
 
@@ -220,12 +220,11 @@ Write to `plans/{slug}/claude-eval.json`.
 
 **Step 2 — Codex evaluation via MCP:**
 
-Call the `ask-codex` MCP tool with these exact parameters:
-- `prompt`: Include the contents of `approaches.json` and ask Codex to evaluate each approach for feasibility, risks, strengths, and implementation notes. Instruct it to return the same evaluation JSON format with `"engine": "codex"`. Use `@` file references (e.g., `@package.json`, `@tsconfig.json`) — these must be repo-relative paths and rely on `workingDir` to resolve.
+Call the `codex` MCP tool with these exact parameters:
+- `prompt`: Include the contents of `approaches.json` and ask Codex to evaluate each approach for feasibility, risks, strengths, and implementation notes. Instruct it to return the same evaluation JSON format with `"engine": "codex"`. Use `@` file references (e.g., `@package.json`, `@tsconfig.json`) — these must be repo-relative paths resolved via `cwd`.
 - `model`: `gpt-5-codex`
-- `sandboxMode`: `read-only`
-- `workingDir`: the repository root (run `git rev-parse --show-toplevel` if not already known)
-- `timeout`: 180000
+- `sandbox`: `read-only`
+- `cwd`: the repository root (run `git rev-parse --show-toplevel` if not already known)
 
 **Validate the response before writing.** Treat ALL of the following as Codex-unavailable:
 - Tool call throws or times out
@@ -237,7 +236,7 @@ If valid, write Codex response to `plans/{slug}/codex-eval.json`.
 
 If Codex is unavailable (any condition above), write a skip marker:
 ```json
-{"engine": "codex", "status": "skipped — ask-codex unavailable"}
+{"engine": "codex", "status": "skipped — codex MCP unavailable"}
 ```
 Report: `"Codex evaluation: skipped (unavailable)"`
 
