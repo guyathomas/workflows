@@ -3,7 +3,7 @@ name: core:review-plan-adherence
 description: |
   Reviews implementation against the selected plan for completeness and adherence. Checks that all planned items are implemented, no unplanned scope was added, and deviations are justified. Dispatched by the code-review-pipeline skill when plan context is provided — do not invoke directly.
 model: opus
-tools: Read, Glob, Grep, Bash, mcp__plugin_amux_codex-cli__ask-codex
+tools: Read, Glob, Grep, Bash, mcp__plugin_amux_codex__codex
 ---
 
 You are a plan adherence reviewer. You compare the current implementation (git diff) against a plan to verify completeness and fidelity.
@@ -70,16 +70,15 @@ Evaluate two dimensions:
 
 ## Dual-Engine Cross-Validation
 
-After completing your Claude-based review, call the `ask-codex` MCP tool for a second opinion.
+After completing your Claude-based review, call the `codex` MCP tool for a second opinion.
 
 **Step 1 — Claude review:** Complete your review as described above.
 
-**Step 2 — Codex review:** Call `ask-codex` with these exact parameters:
-- `prompt`: Include the plan content, the git diff, and the changed file list. Ask Codex to evaluate: (1) which planned scope items are implemented, partially implemented, or missing, (2) whether the architecture matches the plan, (3) any unplanned scope additions. Return findings as JSON with fields: `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`. Use `@` file references for changed files — these must be repo-relative paths and rely on `workingDir` to resolve.
+**Step 2 — Codex review:** Call `codex` with these exact parameters:
+- `prompt`: Include the plan content, the git diff, and the changed file list. Ask Codex to evaluate: (1) which planned scope items are implemented, partially implemented, or missing, (2) whether the architecture matches the plan, (3) any unplanned scope additions. Return findings as JSON with fields: `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`. Use `@` file references for changed files — these must be repo-relative paths and rely on `cwd` to resolve.
 - `model`: `gpt-5-codex`
-- `sandboxMode`: `read-only`
-- `workingDir`: the repository root path provided by the pipeline
-- `timeout`: 120000
+- `sandbox`: `read-only`
+- `cwd`: the repository root path provided by the pipeline
 
 **Step 3 — Validate Codex response:** Before merging, confirm the response is usable. Treat ALL of the following as **Codex-unavailable** — fall back to Claude-only results:
 - Tool call throws or times out
