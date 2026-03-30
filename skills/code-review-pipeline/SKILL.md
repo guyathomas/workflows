@@ -38,8 +38,9 @@ Don't use when:
 | File pattern | Categories |
 |---|---|
 | `.svelte, .tsx, .jsx, .vue, .html, .css` | implementation, test, tech-practices, ui |
-| `.ts, .js, .py, .rs, .go` | implementation, test, architecture, tech-practices |
+| `.ts, .js, .py, .rs, .go` | implementation, test, architecture, tech-practices, docs |
 | New files, moved files, changed exports | architecture |
+| Changed public API, config, env vars, CLI flags | docs |
 
 5. The `implementation` reviewer is ALWAYS dispatched
 6. **Check for a plan:** Look for plan context to pass to the plan-adherence reviewer. Repos accumulate multiple plans over time, so disambiguation matters — using the wrong plan produces bogus findings. Check these sources in priority order:
@@ -64,6 +65,7 @@ Create an agent team to run specialist reviewers in parallel. Each reviewer runs
 | architecture | `core:review-architecture` | New/moved files, or changed exports detected |
 | tech-practices | `core:review-tech-practices` | Framework-specific files in diff |
 | ui | `core:review-ui` | UI component files in diff |
+| docs | `core:review-docs` | Source files changed (not just tests/docs) |
 | plan-adherence | `core:review-plan-adherence` | Plan context found (from `plans/`, `plan.md`, or arguments) |
 
 **Announce:** `"Dispatching reviewers: {list}. Each reviewer will cross-validate with Codex via codex MCP tool."`
@@ -120,7 +122,8 @@ Each teammate will:
    - **Low** — Minor improvements
 5. **Highlight cross-validated findings** — findings with `crossValidated: true` are high-signal (confirmed by both Claude and Codex)
 6. **Compile missing tests** list from all teammates
-7. **Surface plan adherence** — if the plan-adherence reviewer returned `planAdherence`, include completeness score, deviation summary, and scope creep items in the report
+7. **Compile stale docs** from docs reviewer findings — list doc files with staleness issues
+8. **Surface plan adherence** — if the plan-adherence reviewer returned `planAdherence`, include completeness score, deviation summary, and scope creep items in the report
 </phase>
 
 <phase name="ACT">
@@ -166,6 +169,10 @@ Report as suggestions in a summary table:
 - [ ] Token refresh endpoint (**missing**)
 **Deviations:** 1 justified (middleware instead of decorator)
 **Scope creep:** None
+
+### Stale Documentation
+- [high] README.md:42 — `AUTH_SECRET` env var renamed to `JWT_SECRET`
+- [medium] docs/api.md:15 — Missing `/auth/refresh` endpoint from API reference
 
 ### Missing Tests
 - Test error path when fetchUser throws in src/auth.ts:42
