@@ -68,9 +68,9 @@ Report a finding when: a concrete boundary value causes incorrect behavior (cras
    - **Confidence:** 0-100. Be honest — if you're unsure, score lower. Only score 90+ if you can point to the exact failure scenario.
 5. Skip stylistic issues unless they mask bugs
 
-## Dual-Engine Cross-Validation
+## Multi-Engine Cross-Validation
 
-After completing your Claude-based review, call the `codex` MCP tool to get a second opinion from Codex. This cross-validation catches issues that either engine might miss alone.
+After completing your Claude-based review, call Codex and Gemini for second opinions. Each engine is optional — use whichever are available. This cross-validation catches issues that any single engine might miss.
 
 **Step 1 — Claude review:** Complete your review as described above and collect your findings.
 
@@ -80,19 +80,30 @@ After completing your Claude-based review, call the `codex` MCP tool to get a se
 - `sandbox`: `read-only`
 - `cwd`: the repository root path provided by the pipeline
 
-**Step 3 — Validate Codex response:** Before merging, confirm the response is usable. Treat ALL of the following as **Codex-unavailable** — fall back to Claude-only results:
+**Step 3 — Validate Codex response:** Before merging, confirm the response is usable. Treat ALL of the following as **Codex-unavailable**:
 - Tool call throws or times out
 - Response is empty or whitespace-only
 - Response is not valid JSON matching the requested schema
 - Response contains MCP error text (e.g., `"Codex CLI Not Found"`, `"Codex Execution Error"`, `"Authentication Failed"`, `"Permission Error"`)
 
-**Step 4 — Merge findings (only if Codex returned valid JSON):** Compare your Claude findings with Codex findings:
+**Step 4 — Gemini review via CLI:** Write the review prompt (same diff, file list, checklist, and JSON format as sent to Codex) to a temp file, then run via Bash (120s timeout):
+```bash
+gemini -p "$(cat /tmp/gemini-review-prompt.txt)" -m gemini-2.5-pro -o json --approval-mode plan 2>&1
+```
+Use `@` file references for changed files (e.g., `@src/auth.ts`) — these resolve relative to the working directory.
+
+**Step 5 — Validate Gemini response:** Gemini `-o json` returns an envelope: `{"session_id": "...", "response": "...", "stats": {...}}`. Extract the `.response` field and parse it as JSON. Treat ALL of the following as **Gemini-unavailable**:
+- Command exits non-zero or Bash tool times out
+- The `.response` field is empty, whitespace-only, or not valid JSON matching the schema
+- Output contains error text (e.g., `"command not found"`, `"Authentication"`, `"quota"`)
+
+**Step 6 — Merge findings from all available engines:**
 - Match by `file` + `line` (within +/- 3 lines) + semantic similarity of the issue
-- **AGREE**: Both engines found the same issue → set `crossValidated: true`, confidence = max(claude, codex) + 10 (cap 100)
-- **CHALLENGE**: Both found same location but differ on severity → keep higher severity, set `severityDispute: true`
+- **AGREE**: 2+ engines found the same issue → set `crossValidated: true`, confidence = max + 10 per additional engine (cap 100)
+- **CHALLENGE**: 2+ engines found same location but differ on severity → keep higher severity, set `severityDispute: true`
 - **COMPLEMENT**: Only one engine found it → include with `crossValidated: false`
 
-**If Codex is unavailable (any condition above):** Return your Claude-only findings with `crossValidated: false` on all. Do not let a Codex failure block your review.
+**If any engine is unavailable:** Continue with the remaining engines. Do not let an engine failure block your review. A single-engine (Claude-only) result is valid.
 
 ## Output
 
@@ -101,7 +112,7 @@ Return ONLY this JSON (no markdown fences, no commentary):
 ```
 {
   "agent": "implementation-reviewer",
-  "engines": ["claude", "codex"],
+  "engines": ["claude", "codex", "gemini"],
   "filesReviewed": ["path/to/file.ts"],
   "findings": [
     {
@@ -114,7 +125,7 @@ Return ONLY this JSON (no markdown fences, no commentary):
       "category": "security|logic|error-handling|race-condition|resource-leak|type-safety|edge-case",
       "classification": "AGREE|CHALLENGE|COMPLEMENT",
       "crossValidated": true,
-      "engines": ["claude", "codex"]
+      "engines": ["claude", "codex", "gemini"]
     }
   ],
   "missingTests": [],
@@ -123,4 +134,4 @@ Return ONLY this JSON (no markdown fences, no commentary):
 ```
 
 If no issues found, return empty findings array with summary "No issues found".
-If Codex was unavailable, set `"engines": ["claude"]` and note in summary.
+Set `"engines"` to list only the engines that returned valid results (e.g., `["claude"]`, `["claude", "codex"]`, `["claude", "gemini"]`, or all three). Note engine availability in summary.
