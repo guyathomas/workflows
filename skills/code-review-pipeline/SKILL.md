@@ -1,16 +1,16 @@
 ---
 name: review
-description: Creates an agent team of parallel dual-engine code reviewers on your git diff, aggregates findings by severity, and fixes critical/high issues. Each reviewer cross-validates with Codex via MCP. Run after implementing a feature or before committing.
+description: Creates an agent team of parallel multi-engine code reviewers on your git diff, aggregates findings by severity, and fixes critical/high issues. Each reviewer cross-validates with Codex (MCP) and Gemini (CLI). Run after implementing a feature or before committing.
 ---
 
 <objective>
-Orchestrate parallel code review using an agent team of specialist reviewers. Each reviewer performs its own Claude analysis and calls `codex` for cross-validation. Read the git diff, determine which reviewers to spawn as teammates based on file types, run them concurrently, aggregate findings, filter low-confidence noise, and act on results.
+Orchestrate parallel code review using an agent team of specialist reviewers. Each reviewer performs its own Claude analysis and calls Codex (MCP) and Gemini (CLI) for cross-validation. Read the git diff, determine which reviewers to spawn as teammates based on file types, run them concurrently, aggregate findings, filter low-confidence noise, and act on results.
 </objective>
 
 <quick_start>
 1. Run `/code-review-pipeline` after making code changes
 2. Reviewers dispatch automatically based on file types
-3. Each reviewer cross-validates findings with Codex via `codex` MCP tool
+3. Each reviewer cross-validates findings with Codex (MCP) and Gemini (CLI)
 4. Critical/high findings are fixed inline; medium/low reported as suggestions
 </quick_start>
 
@@ -54,7 +54,7 @@ Don't use when:
 </phase>
 
 <phase name="DISPATCH">
-Create an agent team to run specialist reviewers in parallel. Each reviewer runs as an independent teammate with its own context window. Each reviewer independently calls `codex` for Codex cross-validation.
+Create an agent team to run specialist reviewers in parallel. Each reviewer runs as an independent teammate with its own context window. Each reviewer independently calls Codex (MCP) and Gemini (CLI) for cross-validation.
 
 **Dispatch map:**
 
@@ -68,7 +68,7 @@ Create an agent team to run specialist reviewers in parallel. Each reviewer runs
 | docs | `core:review-docs` | Source files changed (not just tests/docs) |
 | plan-adherence | `core:review-plan-adherence` | Plan context found (from `plans/`, `plan.md`, or arguments) |
 
-**Announce:** `"Dispatching reviewers: {list}. Each reviewer will cross-validate with Codex via codex MCP tool."`
+**Announce:** `"Dispatching reviewers: {list}. Each reviewer will cross-validate with Codex (MCP) and Gemini (CLI)."`
 
 Spawn all applicable reviewers as teammates in a single request. Use Opus for each teammate.
 
@@ -107,8 +107,10 @@ Each teammate will:
 1. Perform their Claude-based domain review
 2. Call `codex` MCP tool for Codex cross-validation (with `cwd` set to the repo root)
 3. Validate the Codex response before merging — empty, non-JSON, or error-text responses mean Codex-unavailable
-4. Merge findings with classification (AGREE/CHALLENGE/COMPLEMENT) only if Codex returned valid JSON
-5. Return unified JSON with engine tags
+4. Call Gemini CLI for Gemini cross-validation via Bash (`gemini -p "..." -m gemini-2.5-pro -o json --approval-mode plan`)
+5. Validate Gemini response — extract `.response` from JSON envelope, parse as JSON; empty, non-JSON, or error-text means Gemini-unavailable
+6. Merge findings from all available engines with classification (AGREE/CHALLENGE/COMPLEMENT)
+7. Return unified JSON with engine tags
 </phase>
 
 <phase name="AGGREGATE">
@@ -120,7 +122,7 @@ Each teammate will:
    - **High** — Should fix now
    - **Medium** — Suggestions worth considering
    - **Low** — Minor improvements
-5. **Highlight cross-validated findings** — findings with `crossValidated: true` are high-signal (confirmed by both Claude and Codex)
+5. **Highlight cross-validated findings** — findings with `crossValidated: true` are high-signal (confirmed by 2+ engines)
 6. **Compile missing tests** list from all teammates
 7. **Compile stale docs** from docs reviewer findings — list doc files with staleness issues
 8. **Surface plan adherence** — if the plan-adherence reviewer returned `planAdherence`, include completeness score, deviation summary, and scope creep items in the report
@@ -141,12 +143,12 @@ Report as suggestions in a summary table:
 ```
 ## Review Summary
 
-**Reviewers dispatched:** implementation, test, ui (Opus, dual-engine)
+**Reviewers dispatched:** implementation, test, ui (Opus, multi-engine)
 **Files reviewed:** 5
 **Findings:** 2 critical, 1 high, 3 medium, 1 low
-**Cross-validated:** 2 findings confirmed by both Claude and Codex
+**Cross-validated:** 2 findings confirmed by 2+ engines
 
-### Cross-Validated (flagged by both Claude and Codex)
+### Cross-Validated (flagged by multiple engines)
 - [critical] src/auth.ts:42 — SQL injection via string interpolation (AGREE)
 - [high] src/api.ts:15 — Uncaught promise rejection (AGREE)
 
@@ -159,7 +161,7 @@ Report as suggestions in a summary table:
 |---|---|---|---|---|---|---|
 | medium | implementation | src/utils.ts | 23 | Potential null dereference | Add null check | claude |
 | medium | implementation | src/utils.ts | 25 | Missing boundary check | Validate input range | codex |
-| low | architecture | src/config.ts | 8 | Magic number | Extract to named constant | claude, codex |
+| low | architecture | src/config.ts | 8 | Magic number | Extract to named constant | claude, codex, gemini |
 
 ### Plan Adherence
 **Plan:** plans/feature-slug (Approach 1: "Name")
@@ -191,6 +193,8 @@ If no findings above confidence threshold: report "Review complete — no issues
 | Teammate times out | Log warning, continue with other teammates |
 | No git diff available | Report "No changes to review" and stop |
 | All teammates fail | Report error, suggest running individual reviewer manually |
-| `codex` unavailable in teammate | Teammate returns Claude-only findings (`"engines": ["claude"]`), pipeline continues |
-| `codex` returns empty or error text | Same as unavailable — teammate returns Claude-only findings, pipeline continues |
+| `codex` unavailable in teammate | Teammate returns findings without Codex (`"engines"` omits `"codex"`), pipeline continues |
+| `codex` returns empty or error text | Same as unavailable — teammate returns findings without Codex, pipeline continues |
+| `gemini` CLI unavailable in teammate | Teammate returns findings without Gemini (`"engines"` omits `"gemini"`), pipeline continues |
+| `gemini` returns empty, non-JSON `.response`, or error text | Same as unavailable — teammate returns findings without Gemini, pipeline continues |
 </error_handling>

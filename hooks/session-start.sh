@@ -3,13 +3,23 @@
 
 set -euo pipefail
 
-# Detect Codex CLI presence (necessary but not sufficient for dual-engine mode)
-# The native codex mcp-server must also be configured via plugin.json.
-# command -v only proves the binary exists in PATH — not that MCP can reach it.
+# Detect optional engine CLIs for multi-engine cross-validation
+# command -v only proves the binary exists in PATH — not that MCP/CLI can reach it.
+engines="Claude"
+install_hints=""
 if command -v codex &>/dev/null; then
-    engine_status="**Engines:** Claude + Codex (dual-engine mode available via native codex mcp-server)"
+    engines="$engines + Codex"
 else
-    engine_status="**Engines:** Claude only (install Codex CLI for dual-engine cross-validation: npm i -g @openai/codex)"
+    install_hints="${install_hints}install Codex: npm i -g @openai/codex | "
+fi
+if command -v gemini &>/dev/null; then
+    engines="$engines + Gemini"
+else
+    install_hints="${install_hints}install Gemini: brew install gemini-cli | "
+fi
+engine_status="**Engines:** ${engines} (cross-validation available)"
+if [ -n "$install_hints" ]; then
+    engine_status="${engine_status}\\n_Optional: ${install_hints%% | }_"
 fi
 
 # Detect btca availability (source-level codebase research)

@@ -9,7 +9,7 @@
   "homepage": "https://github.com/guyathomas/amux",
   "repository": "https://github.com/guyathomas/amux",
   "license": "MIT",
-  "keywords": ["skills", "research", "planning", "code-review", "agent-teams", "codex", "dual-engine"],
+  "keywords": ["skills", "research", "planning", "code-review", "agent-teams", "codex", "gemini", "multi-engine"],
   "mcpServers": {
     "codex": {
       "command": "codex",

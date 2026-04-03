@@ -1,13 +1,13 @@
 ---
 name: planning
-description: Use before implementing any non-trivial feature - validates approaches against real sources using Context7, Serper, GitHub MCPs, and optionally btca for source-level codebase research. Evaluates with dual engines before committing to an implementation
+description: Use before implementing any non-trivial feature - validates approaches against real sources using Context7, Serper, GitHub MCPs, and optionally btca for source-level codebase research. Evaluates with multiple engines before committing to an implementation
 ---
 
 # Planning
 
 ## Overview
 
-Research-first planning. Validate approaches against real documentation, real codebases, and real implementations before writing code. Dual-engine evaluation cross-validates feasibility.
+Research-first planning. Validate approaches against real documentation, real codebases, and real implementations before writing code. Multi-engine evaluation cross-validates feasibility.
 
 **Core principle:** No implementation without evidence-backed, cross-validated approach selection.
 
@@ -190,7 +190,7 @@ Update `state.json` with `phase: "FORMULATE"`.
 
 ### EVALUATE
 
-Dual-engine evaluation of the formulated approaches. Claude evaluates inline, then calls `codex` MCP tool for Codex's perspective, and merges the results.
+Multi-engine evaluation of the formulated approaches. Claude evaluates inline, then calls Codex (MCP) and Gemini (CLI) for additional perspectives, and merges all available results.
 
 **Step 1 — Claude evaluation:**
 
@@ -240,15 +240,36 @@ If Codex is unavailable (any condition above), write a skip marker:
 ```
 Report: `"Codex evaluation: skipped (unavailable)"`
 
+**Step 2b — Gemini evaluation via CLI:**
+
+Write a prompt to a temp file containing the same `approaches.json` content and evaluation instructions (same JSON format with `"engine": "gemini"`). Then run via Bash (120s timeout):
+```bash
+gemini -p "$(cat /tmp/gemini-eval-prompt.txt)" -m gemini-2.5-pro -o json --approval-mode plan 2>&1
+```
+Use `@` file references (e.g., `@package.json`, `@tsconfig.json`) — these resolve relative to the working directory.
+
+**Parse and validate:** Gemini `-o json` returns an envelope: `{"session_id": "...", "response": "...", "stats": {...}}`. Extract the `.response` field and parse it as JSON. Treat ALL of the following as Gemini-unavailable:
+- Command exits non-zero or Bash tool times out
+- The `.response` field is empty, whitespace-only, or not valid JSON matching the schema
+- Output contains error text (e.g., `"command not found"`, `"Authentication"`, `"quota"`)
+
+If valid, write Gemini response to `plans/{slug}/gemini-eval.json`.
+
+If Gemini is unavailable (any condition above), write a skip marker:
+```json
+{"engine": "gemini", "status": "skipped — gemini CLI unavailable"}
+```
+Report: `"Gemini evaluation: skipped (unavailable)"`
+
 **Step 3 — Inline merge:**
 
-Compare the two evaluations by approach index:
+Compare all available evaluations by approach index:
 
 | Pattern | Classification | Action |
 |---|---|---|
-| Both prefer same approach | **AGREE** | Strong signal. Merge rationales. |
-| Different preferred approaches | **CHALLENGE** | Surface both rationales. Flag for human decision. |
-| One engine identifies a risk/strength the other missed | **COMPLEMENT** | Merge into the approach's evaluation. |
+| All available engines prefer same approach | **AGREE** | Strong signal. Merge rationales. |
+| Engines prefer different approaches | **CHALLENGE** | Surface all rationales. Flag for human decision. |
+| One engine identifies a risk/strength others missed | **COMPLEMENT** | Merge into the approach's evaluation. |
 
 Produce merged evaluation:
 ```json
@@ -259,10 +280,11 @@ Produce merged evaluation:
       "name": "approach name",
       "claudeEval": { "feasibility": "high", "risks": [], "strengths": [] },
       "codexEval": { "feasibility": "high", "risks": [], "strengths": [] },
+      "geminiEval": { "feasibility": "high", "risks": [], "strengths": [] },
       "merged": {
         "feasibility": "high",
-        "risks": ["merged unique risks from both"],
-        "strengths": ["merged unique strengths from both"],
+        "risks": ["merged unique risks from all engines"],
+        "strengths": ["merged unique strengths from all engines"],
         "classification": "AGREE|CHALLENGE|COMPLEMENT"
       }
     }
@@ -270,19 +292,25 @@ Produce merged evaluation:
   "recommendation": {
     "approachIndex": 1,
     "confidence": "high|medium|low",
-    "reason": "Both engines agree on approach 1 due to...",
+    "reason": "All engines agree on approach 1 due to...",
     "dissent": null
   },
   "summary": {
     "agreement": "full|partial|none",
-    "enginesUsed": ["claude", "codex"]
+    "enginesUsed": ["claude", "codex", "gemini"]
   }
 }
 ```
 
 Write to `plans/{slug}/merged-eval.json`.
 
-If Codex was unavailable, pass through Claude eval with `"enginesUsed": ["claude"]` and `"confidence": "medium"` (single-engine, lower confidence).
+Confidence rules:
+- All available engines agree → `"confidence": "high"`
+- Majority agrees (2 of 3) → `"confidence": "high"` with dissent noted
+- All disagree → `"confidence": "low"`, flag for human decision
+- Single engine only (Claude-only) → `"confidence": "medium"`
+
+Set `"enginesUsed"` to list only the engines that returned valid results. Omit `codexEval`/`geminiEval` fields from approach objects when those engines were unavailable.
 
 Update `state.json` with `phase: "EVALUATE"`.
 

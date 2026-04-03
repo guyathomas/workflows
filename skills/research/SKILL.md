@@ -292,6 +292,32 @@ If Codex returned valid JSON, compare findings with your web-sourced findings:
 If Codex is unavailable (any condition above), return your Claude-only findings. Do not block on Codex.
 </teammate_codex_crossvalidation>
 
+<teammate_gemini_crossvalidation>
+## Cross-Validation with Gemini
+
+After Codex cross-validation (or if Codex was unavailable), call Gemini CLI to further cross-validate your findings.
+
+Write a prompt to a temp file: "Research this question: {QUESTION}. Return findings as JSON with fields: fact, sourceNote, confidence (high/medium/low). Focus on facts you can confirm from your training data."
+
+Then run via Bash (120s timeout):
+```bash
+gemini -p "$(cat /tmp/gemini-research-prompt.txt)" -m gemini-2.5-pro -o json --approval-mode plan 2>&1
+```
+
+**Parse and validate.** Gemini `-o json` returns an envelope: `{"session_id": "...", "response": "...", "stats": {...}}`. Extract the `.response` field and parse it as JSON. Treat ALL of the following as Gemini-unavailable:
+- Command exits non-zero or Bash tool times out
+- The `.response` field is empty, whitespace-only, or not valid JSON matching the schema
+- Output contains error text (e.g., `"command not found"`, `"Authentication"`, `"quota"`)
+
+If Gemini returned valid JSON, compare findings with your existing findings (same rules as Codex):
+- **AGREE**: Both found the same fact → boost confidence, note as cross-validated
+- **CHALLENGE**: Gemini contradicts a finding → note the contradiction, keep the web-sourced version with the contradiction documented
+- **COMPLEMENT (Gemini-only)**: Gemini reports a fact not found elsewhere → include with `"status": "hypothesis"`
+- **COMPLEMENT (existing-only)**: You found it but Gemini didn't → keep as-is
+
+If Gemini is unavailable (any condition above), return your findings without it. Do not block on Gemini.
+</teammate_gemini_crossvalidation>
+
 <teammate_return_format>
 **RETURN ONLY THIS JSON:**
 ```json
@@ -316,7 +342,8 @@ If Codex is unavailable (any condition above), return your Claude-only findings.
   "contradictions": ["X says A, Y says B"],
   "confidence": "high|medium|low",
   "confidenceReason": "...",
-  "codexAvailable": true
+  "codexAvailable": true,
+  "geminiAvailable": true
 }
 ```
 </teammate_return_format>

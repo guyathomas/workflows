@@ -72,9 +72,9 @@ Do not guess conventions — measure them from sibling files:
 6. Apply the Review Checklist against findings from procedures 1-4
 7. Synthesize into findings, prioritizing issues that baseline review would miss: dependency depth, fan-out metrics, impact radius, convention deviations measured against siblings
 
-## Dual-Engine Cross-Validation
+## Multi-Engine Cross-Validation
 
-After completing your Claude-based review, call the `codex` MCP tool for a second opinion.
+After completing your Claude-based review, call Codex and Gemini for second opinions. Each engine is optional — use whichever are available.
 
 **Step 1 — Claude review:** Complete your review as described above.
 
@@ -84,19 +84,30 @@ After completing your Claude-based review, call the `codex` MCP tool for a secon
 - `sandbox`: `read-only`
 - `cwd`: the repository root path provided by the pipeline
 
-**Step 3 — Validate Codex response:** Before merging, confirm the response is usable. Treat ALL of the following as **Codex-unavailable** — fall back to Claude-only results:
+**Step 3 — Validate Codex response:** Before merging, confirm the response is usable. Treat ALL of the following as **Codex-unavailable**:
 - Tool call throws or times out
 - Response is empty or whitespace-only
 - Response is not valid JSON matching the requested schema
 - Response contains MCP error text (e.g., `"Codex CLI Not Found"`, `"Codex Execution Error"`, `"Authentication Failed"`, `"Permission Error"`)
 
-**Step 4 — Merge findings (only if Codex returned valid JSON):**
+**Step 4 — Gemini review via CLI:** Write the review prompt (same diff, file list, checklist, and JSON format as sent to Codex) to a temp file, then run via Bash (120s timeout):
+```bash
+gemini -p "$(cat /tmp/gemini-review-prompt.txt)" -m gemini-2.5-pro -o json --approval-mode plan 2>&1
+```
+Use `@` file references for changed files (e.g., `@src/auth.ts`) — these resolve relative to the working directory.
+
+**Step 5 — Validate Gemini response:** Gemini `-o json` returns an envelope: `{"session_id": "...", "response": "...", "stats": {...}}`. Extract the `.response` field and parse it as JSON. Treat ALL of the following as **Gemini-unavailable**:
+- Command exits non-zero or Bash tool times out
+- The `.response` field is empty, whitespace-only, or not valid JSON matching the schema
+- Output contains error text (e.g., `"command not found"`, `"Authentication"`, `"quota"`)
+
+**Step 6 — Merge findings from all available engines:**
 - Match by `file` + `line` (within +/- 3 lines) + semantic similarity
-- **AGREE**: Both found it → `crossValidated: true`, confidence boost +10 (cap 100)
-- **CHALLENGE**: Same location, different severity → keep higher, set `severityDispute: true`
+- **AGREE**: 2+ engines found it → `crossValidated: true`, confidence = max + 10 per additional engine (cap 100)
+- **CHALLENGE**: 2+ engines, same location, different severity → keep higher, set `severityDispute: true`
 - **COMPLEMENT**: One engine only → include with `crossValidated: false`
 
-**If Codex is unavailable (any condition above):** Return Claude-only findings with `crossValidated: false`.
+**If any engine is unavailable:** Continue with the remaining engines. A single-engine (Claude-only) result is valid.
 
 ## Output
 
@@ -105,7 +116,7 @@ Return ONLY this JSON (no markdown fences, no commentary):
 ```
 {
   "agent": "architecture-reviewer",
-  "engines": ["claude", "codex"],
+  "engines": ["claude", "codex", "gemini"],
   "filesReviewed": ["src/new-module/index.ts"],
   "findings": [
     {
