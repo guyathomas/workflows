@@ -7,20 +7,24 @@ Research, planning, and code review skills for Claude Code with dual-engine cros
 ### Skills (3)
 
 - **research** — Deep research with 20+ sources and confidence tracking, powered by agent teams with Codex cross-validation
-- **planning** — Pre-implementation planning that researches approaches using Context7, Serper, GitHub MCPs, and optionally btca for source-level codebase research, with dual-engine evaluation via Codex MCP
-- **code-review-pipeline** — Multi-reviewer code review using agent teams (architecture, implementation, tech practices, tests, UI), each cross-validated with Codex
+- **planning** — Pre-implementation planning that researches approaches using Context7, Serper, GitHub MCPs, and optionally btca for source-level codebase research, with dual-engine evaluation via Codex MCP. Once an approach is selected, a multi-agent (Claude + Codex) REVIEW-PLAN step stress-tests the plan for gaps and risks before any code is written.
+- **code-review-pipeline** — Multi-reviewer code review using agent teams (code, tests, docs), each cross-validated with Codex. The skill owns the dual-engine collaboration standard and the suggested-tools menu, injecting both into every reviewer.
 
-### Agents (6)
+### Agents (4)
 
-**Pipeline reviewers (5):** architecture, implementation, tech practices, tests, UI — dispatched by the code-review-pipeline skill based on file types. Each performs Claude analysis and calls the native `codex` MCP tool for cross-validation.
+**Pipeline reviewers (3):** dispatched by the code-review-pipeline skill based on what the change needs.
+- **code** — the generalist: bugs, logic, security, error handling, structure (coupling/cohesion/API surface), and framework best-practices in one pass
+- **tests** — coverage gaps, test antipatterns, missing cases
+- **docs** — documentation staleness
 
-**Standalone reviewer (1):** code — reviews completed work against the original plan and coding standards. Invoked via `/review-code`.
+**Standalone reviewer (1):** **review-code** — reviews completed work against the original plan and coding standards. Invoked via `/review-code`; carries its own self-contained cross-validation since it runs outside the pipeline.
 
-### Commands (8)
+### Commands (4)
 
 - `/research` — Start a deep research session
+- `/planning` — Plan a non-trivial feature before implementation
 - `/code-review-pipeline` — Run the full review pipeline
-- `/review-architecture`, `/review-code`, `/review-implementation`, `/review-tech-practices`, `/review-tests`, `/review-ui` — Individual review commands
+- `/review-code` — Standalone plan-alignment + standards review
 
 ### Hooks
 
@@ -30,7 +34,7 @@ Research, planning, and code review skills for Claude Code with dual-engine cros
 
 ### Dual-Engine Architecture
 
-Each reviewer agent independently:
+The collaboration standard is defined once in the code-review-pipeline skill and injected into every reviewer's task context, so each agent definition stays thin. Following that standard, each reviewer independently:
 1. Performs Claude-based domain review
 2. Calls the native `codex` MCP tool with `cwd` set to the repo root
 3. Validates the Codex response — empty, non-JSON, or MCP error-text responses are treated as Codex-unavailable
