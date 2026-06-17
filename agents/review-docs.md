@@ -20,9 +20,11 @@ You receive a git diff, changed file list, and the repository root path.
 
 ## Review Process
 
+The steps below are a suggested method — you decide how best to judge staleness for the docs and diff in front of you. Use the doc types, change categories, and staleness checks that fit; skip what doesn't apply, and follow other angles the change suggests. The output JSON fields are fixed; how you decide what's stale is your call.
+
 ### 1. Discover documentation
 
-Use `Glob` to find documentation files in the repo. Check for:
+Use `Glob` to find documentation files in the repo. Consider doc types like:
 
 | Doc type | Patterns |
 |---|---|
@@ -53,7 +55,7 @@ Skip doc types that are clearly unaffected by the change category.
 
 ### 3. Check for staleness
 
-For each relevant doc, `Read` it and check:
+For each relevant doc, `Read` it and check whichever of these apply:
 
 1. **Factual accuracy** — Does the doc describe behavior, APIs, config, or architecture that the diff has changed? A doc claiming "authentication uses sessions" is stale if the diff switches to JWT.
 2. **Dead references** — Does the doc reference files, functions, classes, CLI flags, env vars, or endpoints that were renamed or removed in the diff?
@@ -68,31 +70,9 @@ For functions/classes with significant signature or behavior changes in the diff
 - If the docstring describes parameters, return values, or behavior that the diff has changed, flag it
 - Do NOT flag functions that lack docstrings — missing docs is not staleness
 
-## Dual-Engine Cross-Validation
+## Cross-validation
 
-After completing your Claude-based review, call the `codex` MCP tool for a second opinion.
-
-**Step 1 — Claude review:** Complete your review as described above.
-
-**Step 2 — Codex review:** Call `codex` with these exact parameters:
-- `prompt`: Include the diff and changed file list. Ask Codex to check whether any documentation files in the repo contain information that is now inaccurate or incomplete given these code changes. Look for: stale references to renamed/removed items, outdated descriptions of changed behavior, missing entries in existing lists/tables. Return findings as JSON with fields: `severity`, `confidence`, `file`, `line`, `issue`, `recommendation`, `category`. Use `@` file references for doc files — these must be repo-relative paths resolved via `cwd`.
-- `model`: `gpt-5-codex`
-- `sandbox`: `read-only`
-- `cwd`: the repository root path provided by the pipeline
-
-**Step 3 — Validate Codex response:** Before merging, confirm the response is usable. Treat ALL of the following as **Codex-unavailable** — fall back to Claude-only results:
-- Tool call throws or times out
-- Response is empty or whitespace-only
-- Response is not valid JSON matching the requested schema
-- Response contains MCP error text (e.g., `"Codex CLI Not Found"`, `"Codex Execution Error"`, `"Authentication Failed"`, `"Permission Error"`)
-
-**Step 4 — Merge findings (only if Codex returned valid JSON):**
-- Match by `file` + `line` (within +/- 3 lines) + semantic similarity
-- **AGREE**: Both found it → `crossValidated: true`, confidence boost +10 (cap 100)
-- **CHALLENGE**: Same location, different severity → keep higher, set `severityDispute: true`
-- **COMPLEMENT**: One engine only → include with `crossValidated: false`
-
-**If Codex is unavailable (any condition above):** Return Claude-only findings with `crossValidated: false`.
+Cross-validate your findings with Codex per the **dual-engine collaboration standard** provided in your task context (focus Codex on stale references to renamed/removed items, outdated behavior descriptions, and missing entries in existing lists/tables).
 
 ## Output
 
