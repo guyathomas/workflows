@@ -1,6 +1,6 @@
 ---
 name: research
-description: Use when user explicitly requests deep research or comprehensive analysis requiring 20+ authoritative sources. Creates an agent team for parallel research with source gate enforcement, confidence tracking, and structured synthesis. NOT for simple questions answerable with a single search.
+description: Use when user explicitly requests deep research or comprehensive analysis across many authoritative sources. Creates an agent team for parallel research, gated on answer sufficiency (not a source count), with confidence tracking and structured synthesis. NOT for simple questions answerable with a single search.
 ---
 
 <objective>
@@ -9,49 +9,14 @@ Comprehensive research using an agent team, web search, and web scraping. Iterat
 Core principle: Decompose questions, research in parallel with an agent team, evaluate confidence, iterate until sufficient, synthesize with source attribution.
 </objective>
 
-<quick_start>
-1. Run `/research [topic]` to start
-2. Research continues automatically until `targetSources` is met
-3. A task loop hook enforces the source gate — you cannot exit early
-4. On completion, a resource usage report is displayed
-</quick_start>
-
 <success_criteria>
-Task is complete when ALL of these are true:
-- [ ] `state.json` exists with valid JSON
-- [ ] `sourcesGathered >= targetSources` (primary gate - enforced by task loop hook)
-- [ ] All questions marked `"done"` with confidence ratings
-- [ ] `report.md` synthesizes findings with source attribution
-- [ ] `phase` is `"DONE"` in state.json
-- [ ] Conflicting information documented with source quality assessment
-- [ ] Gaps and limitations explicitly noted in report
+Done when: `state.json` `phase` is `"DONE"`, every question is answered at `medium`+ confidence (or remaining gaps are documented as limitations), and `report.md` synthesizes findings with source attribution, conflicts, gaps, and limitations. Sufficiency — not a source count — is the bar.
 </success_criteria>
 
 <when_to_use>
-```dot
-digraph when_research {
-    "User request?" [shape=diamond];
-    "Needs multiple sources?" [shape=diamond];
-    "Quick answer sufficient?" [shape=box];
-    "Use research skill" [shape=box];
+Use when the user explicitly asks for deep research / comprehensive analysis needing multiple authoritative sources, confidence tracking, and source attribution.
 
-    "User request?" -> "Needs multiple sources?" [label="deep research\ncomprehensive analysis\nthorough investigation"];
-    "User request?" -> "Quick answer sufficient?" [label="simple question"];
-    "Needs multiple sources?" -> "Use research skill" [label="yes"];
-    "Needs multiple sources?" -> "Quick answer sufficient?" [label="no"];
-}
-```
-
-Use when:
-- User explicitly asks for "deep research" or "comprehensive analysis"
-- Topic requires multiple authoritative sources
-- Need to track confidence and identify gaps
-- Want structured output with source attribution
-
-Don't use when:
-- Simple factual question (single search sufficient)
-- User wants quick answer, not exhaustive report
-- Topic is too narrow for 8-question decomposition
+Don't use for simple factual questions a single search answers, or topics too narrow for an 8-question decomposition.
 </when_to_use>
 
 <required_tools>
@@ -83,6 +48,7 @@ State File: `research/{slug}/state.json`
   "topic": "string",
   "phase": "INIT|DECOMPOSE|RESEARCH|EVALUATE|SYNTHESIZE|DONE",
   "iteration": 0,
+  "maxIterations": 5,
   "targetSources": 30,
   "sourcesGathered": 0,
   "totalSearches": 0,
@@ -99,16 +65,14 @@ Rule: Read `state.json` before acting. Write `state.json` after acting.
 </state_machine>
 
 <task_loop>
-A generic task loop hook prevents the session from ending while `task-loop.json` has `complete: false`. This is a hard gate — you cannot bypass it by rationalizing.
+A generic task loop hook prevents the session from ending while `task-loop.json` has `complete: false`, so research isn't abandoned mid-flight.
 
 How it works:
 1. When you try to exit, the hook reads `research/{slug}/task-loop.json`
 2. If `complete` is false, exit is blocked and `continuationPrompt` is re-injected
 3. Once you set `complete: true`, exit is allowed and `completionMessage` is displayed
 
-You manage `task-loop.json` alongside `state.json`. Update `statusMessage` and `continuationPrompt` as progress changes so the hook always has current context.
-
-Default target: 30 sources. Adjust in INIT phase based on topic complexity.
+You manage `task-loop.json` alongside `state.json`. Update `statusMessage` and `continuationPrompt` as progress changes. Set `complete: true` when EVALUATE's sufficiency gate passes **or** the iteration ceiling is hit — both are legitimate exits, so the loop always terminates.
 </task_loop>
 
 <state_recovery>
@@ -149,38 +113,19 @@ On skill invocation, first check for existing state:
    mkdir -p research/{slug}
    ```
 
-4. Determine target sources based on topic complexity:
-   - Narrow topic (specific question): 20 sources
-   - Standard topic (most research): 30 sources (default)
-   - Broad topic (comprehensive review): 40 sources
+4. Set `targetSources` as a rough expectation for the topic's breadth (narrow ~20, standard ~30, broad ~40) and `maxIterations` (default 5). These are signals/backstops, not the completion bar — sufficiency is.
 
 5. Initialize state files:
 
-   state.json:
-   ```json
-   {
-     "topic": "...",
-     "phase": "DECOMPOSE",
-     "iteration": 0,
-     "targetSources": 30,
-     "sourcesGathered": 0,
-     "totalSearches": 0,
-     "teammateCompletions": 0,
-     "codexCompletions": 0,
-     "findingsCount": 0,
-     "startTime": "2024-01-15T10:30:00Z",
-     "scraper": "firecrawl|webfetch",
-     "questions": []
-   }
-   ```
+   state.json: use the schema from `<state_machine>` with `phase: "DECOMPOSE"`, counters at 0, `startTime` set, `questions: []`.
 
    task-loop.json (activates the generic task loop hook):
    ```json
    {
      "active": true,
      "complete": false,
-     "continuationPrompt": "Continue researching: {topic}. Check research/{slug}/state.json for current progress and continue the RESEARCH phase.",
-     "statusMessage": "Research in progress: {topic}\nSources: 0/{targetSources}",
+     "continuationPrompt": "Continue researching: {topic}. Check research/{slug}/state.json and continue the RESEARCH phase.",
+     "statusMessage": "Research in progress: {topic}",
      "completionMessage": "Research complete."
    }
    ```
@@ -192,18 +137,9 @@ On skill invocation, first check for existing state:
 </phase>
 
 <phase name="DECOMPOSE">
-Generate exactly 8 questions covering these angles:
+Decompose the topic into the questions that actually matter for it. Use your judgment on count and framing — cover the angles the topic warrants and skip those it doesn't.
 
-| # | Angle | Example |
-|---|-------|---------|
-| 1 | Definition/background | What is X? History and context? |
-| 2 | Current state | What's happening now? Recent developments (last 1-2 years)? |
-| 3 | Key entities | Who are the main people, companies, organizations? |
-| 4 | Core mechanisms | How does it work? What are the processes? |
-| 5 | Evidence and data | What studies, statistics, data exist? |
-| 6 | Criticisms and limitations | What are the problems, risks, downsides? |
-| 7 | Comparisons | How does it compare to alternatives? |
-| 8 | Future developments | What's coming next? Predictions? |
+Common angles to draw from (a menu, not a checklist): definition/background, current state, key entities, core mechanisms, evidence and data, criticisms and limitations, comparisons to alternatives, future developments. Add others the specific topic demands.
 
 Add questions to `state.json` with `status="pending"`. Set `phase="RESEARCH"`.
 </phase>
@@ -213,83 +149,28 @@ Create an agent team to research pending questions in parallel. Each teammate in
 
 **Claude teammates:** One per pending question (up to 8 at a time). Each works independently with its own context window. Each teammate also calls the `codex` MCP tool to get Codex's perspective on the same question, providing genuine cross-validation — two engines may surface different sources and perspectives.
 
-Read `scraper` from state.json and use the appropriate instructions when spawning each Claude teammate:
+Read `scraper` from state.json. Spawn each Claude teammate with these instructions, substituting `{SCRAPER}` = `firecrawl-mcp:firecrawl_scrape` or `WebFetch` accordingly:
 
-<teammate_instructions scraper="firecrawl">
-You are a researcher teammate with access to `WebSearch` and `firecrawl-mcp:firecrawl_scrape`.
-
-**TASK:** {QUESTION}
-
-**PROCESS:**
-
-1. Run exactly 4 searches:
-   - Core query
-   - Add "research" or "study"
-   - Add current year or "recent"
-   - Rephrase with synonyms
-
-2. Rank URLs by quality:
-   - **Tier 1:** .gov, .edu, journals, official docs
-   - **Tier 2:** Reuters, AP, BBC, industry publications
-   - **Tier 3:** Company blogs, Wikipedia
-   - **Skip:** Forums, social media, SEO spam
-
-3. Select top 4 URLs (prefer Tier 1-2)
-
-4. Use `firecrawl-mcp:firecrawl_scrape` on each. Continue if one fails.
-
-5. Extract specific facts with sources.
-</teammate_instructions>
-
-<teammate_instructions scraper="webfetch">
-You are a researcher teammate with access to `WebSearch` and `WebFetch`.
+<teammate_instructions>
+You are a researcher teammate with `WebSearch` and `{SCRAPER}`.
 
 **TASK:** {QUESTION}
 
-**PROCESS:**
+Run enough searches to answer the question well, then scrape the best sources with `{SCRAPER}` ("Extract main content and key facts") and extract specific facts with their sources. Continue if a scrape fails. Use your judgment on how many searches and sources are enough.
 
-1. Run exactly 4 searches:
-   - Core query
-   - Add "research" or "study"
-   - Add current year or "recent"
-   - Rephrase with synonyms
-
-2. Rank URLs by quality:
-   - **Tier 1:** .gov, .edu, journals, official docs
-   - **Tier 2:** Reuters, AP, BBC, industry publications
-   - **Tier 3:** Company blogs, Wikipedia
-   - **Skip:** Forums, social media, SEO spam
-
-3. Select top 4 URLs (prefer Tier 1-2)
-
-4. Use `WebFetch` on each with a prompt like "Extract the main content and key facts from this page". Continue if one fails.
-
-5. Extract specific facts with sources.
+Quality guide (favour higher tiers): Tier 1 — .gov, .edu, journals, official docs · Tier 2 — Reuters, AP, BBC, industry pubs · Tier 3 — company blogs, Wikipedia · Skip — forums, social media, SEO spam.
 </teammate_instructions>
 
 <teammate_codex_crossvalidation>
 ## Cross-Validation with Codex
 
-After completing your web research above, call the `codex` MCP tool to cross-validate your findings.
+After web research, call the `codex` MCP tool (`model: gpt-5-codex`, `sandbox: read-only`) with prompt: "Research this question: {QUESTION}. Return JSON findings with fields: fact, sourceNote, confidence (high/medium/low). Focus on facts confirmable from training data."
 
-Call the `codex` MCP tool with these exact parameters:
-- `prompt`: "Research this question: {QUESTION}. Return findings as JSON with fields: fact, sourceNote, confidence (high/medium/low). Focus on facts you can confirm from your training data."
-- `model`: `gpt-5-codex`
-- `sandbox`: `read-only`
-
-**Validate the response before merging.** Treat ALL of the following as Codex-unavailable:
-- Tool call throws or times out
-- Response is empty or whitespace-only
-- Response is not valid JSON matching the requested schema
-- Response contains MCP error text (e.g., `"Codex CLI Not Found"`, `"Codex Execution Error"`)
-
-If Codex returned valid JSON, compare findings with your web-sourced findings:
-- **AGREE**: Both found the same fact → boost confidence, note as cross-validated
-- **CHALLENGE**: Codex contradicts a web-sourced fact → note the contradiction, keep the web-sourced version with the contradiction documented
-- **COMPLEMENT (Codex-only)**: Codex reports a fact you didn't find online → include it with `"status": "hypothesis"` since Codex cannot cite web sources
-- **COMPLEMENT (Claude-only)**: You found it but Codex didn't → keep as-is with your web source
-
-If Codex is unavailable (any condition above), return your Claude-only findings. Do not block on Codex.
+Treat codex as unavailable if the call throws/times out, or returns empty/non-JSON/MCP-error text (e.g. `"Codex CLI Not Found"`) — then return Claude-only findings. If valid JSON, merge per question:
+- **AGREE** (same fact): boost confidence, mark cross-validated.
+- **CHALLENGE** (contradicts web fact): keep web version, document the contradiction.
+- **COMPLEMENT (Codex-only)**: include with `"status": "hypothesis"` (no web citation).
+- **COMPLEMENT (Claude-only)**: keep as-is.
 </teammate_codex_crossvalidation>
 
 <teammate_return_format>
@@ -338,42 +219,23 @@ After all teammates complete:
 </phase>
 
 <phase name="EVALUATE">
-Calculate metrics:
+Decide whether the research is **sufficient** — judged on whether the questions are actually answered, not on a source count.
 
-| Metric | Calculation |
-|--------|-------------|
-| `sourcesGathered` | from state.json (primary gate) |
-| `targetSources` | from state.json |
-| `avgConfidence` | high=3, medium=2, low=1, average all |
-| `significantGaps` | unique gaps across findings |
+**Sufficiency gate → SYNTHESIZE when both hold:**
+- Every question is answered at `medium` confidence or better (high=3, medium=2, low=1).
+- Significant gaps and contradictions are resolved, or explicitly documented as limitations.
 
-Decision table (two-stage):
+`sourcesGathered` vs `targetSources` is a **sanity signal**, not a gate: if you'd synthesize with far fewer sources than expected, double-check you haven't stopped short; if you're well past target but still thin, keep going. Don't pad to hit a number.
 
-Stage 1: Source Gate (MANDATORY)
-
-| sourcesGathered >= targetSources | → Action |
-|:--------------------------------:|:--------:|
-| No | RESEARCH (forced, cannot proceed) |
-| Yes | Continue to Stage 2 |
-
-You MUST gather enough sources before considering other criteria.
-
-Stage 2: Quality Gate (only if Stage 1 passes)
-
-| avgConfidence >= 2.5 AND gaps <= 2 | → Decision |
-|:----------------------------------:|:----------:|
-| Yes | SYNTHESIZE |
-| No | RESEARCH (generate follow-ups) |
-
-Note: The task loop hook enforces the source gate — you cannot exit until `task-loop.json` has `complete: true`.
+**Otherwise → RESEARCH** another round, unless the **iteration ceiling** (`maxIterations`, default 5) is reached — then SYNTHESIZE with the remaining gaps documented as limitations (futility exit; never loop forever).
 
 If continuing to RESEARCH:
-1. Generate max 4 follow-up questions from gaps/contradictions
-2. Add to questions with `status="pending"`
-3. Increment iteration
-4. Set `phase="RESEARCH"`
-5. Update `task-loop.json`: set `statusMessage` to current progress (`"Sources: {sourcesGathered}/{targetSources}"`) and `continuationPrompt` to reflect remaining work
-6. Log: `"Continuing research: {sourcesGathered}/{targetSources} sources, need more to meet target"`
+1. Generate follow-up questions from gaps/contradictions (as many as the gaps warrant)
+2. Add to questions with `status="pending"`; increment `iteration`; set `phase="RESEARCH"`
+3. Update `task-loop.json`: set `statusMessage` and `continuationPrompt` to the specific open questions
+4. Log: `"Continuing research: {N} questions still below confidence / {M} open gaps"`
+
+Set `complete: true` in `task-loop.json` only when the sufficiency gate passes or the iteration ceiling is hit.
 </phase>
 
 <phase name="SYNTHESIZE">
@@ -447,25 +309,15 @@ The task loop hook will display this message when the session exits.
 </error_handling>
 
 <limits>
-| Resource | Default | Notes |
-|----------|---------|-------|
-| Target sources | 30 | Adjustable in INIT (20-40 based on complexity) |
-| Teammates per batch | 8 | Parallel research questions (one teammate per question) |
-| URLs per teammate | 4 | Sources scraped per question |
-| Follow-ups per iteration | 4 | New questions from gaps |
+| Resource | Guide | Notes |
+|----------|-------|-------|
+| Target sources | ~30 | Breadth signal, not a gate (set in INIT, ~20-40 by complexity) |
+| Max iterations | 5 | Hard backstop — forces a futility exit so the loop always terminates |
+| Teammates per batch | 8 | Parallelism cap — one teammate per pending question |
 
-No hard iteration or search limits. The source gate is the primary constraint. Research continues until `sourcesGathered >= targetSources`.
+Searches per teammate, URLs scraped, and follow-ups per iteration are the agent's discretion. Completion is governed by the **sufficiency gate** (EVALUATE), bounded by `maxIterations`.
 </limits>
 
 <red_flags>
-STOP if you catch yourself thinking any of these:
-
-| Thought | Reality |
-|---------|---------|
-| "I have high confidence, I can skip the source target" | The task loop hook will block you. Gather the sources — it's non-negotiable. |
-| "This topic is too broad for 8 questions" | Narrow the scope first. Don't start research on vague topics. |
-| "I'll just synthesize what I have" | Check `sourcesGathered >= targetSources` in state.json. If not met, you cannot proceed. |
-| "I don't need to update state.json" | You will lose track. Always read/write state.json. |
-| "All sources are equal" | Weight Tier 1 sources higher in synthesis. |
-| "I'm stuck, I'll just finish" | Narrow the scope or generate better follow-up questions. The task loop hook will block you. |
+Stop on **sufficiency, not a number**: synthesize once every question is answered at `medium`+ confidence with gaps documented — don't pad sources to hit a target, and don't quit while questions are still thin (unless `maxIterations` is reached). Weight Tier 1 sources higher. If stuck, narrow scope or generate sharper follow-ups.
 </red_flags>

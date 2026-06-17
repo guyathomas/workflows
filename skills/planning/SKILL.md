@@ -22,6 +22,20 @@ Research-first planning. Validate approaches against real documentation, real co
 
 **Don't use for:** Single-line fixes, obvious bugs, tasks with explicit instructions.
 
+## Suggested research tools
+
+Reach for the tools that fit what you need to learn — which and how many is your call. RESEARCH runs these in parallel as subagents.
+
+- **Context7** (`resolve-library-id`, `query-docs`) — current library/framework API docs, version gotchas, deprecations
+- **Serper / WebSearch** — real-world implementations, best-practice articles, comparisons
+- **GitHub** (`search-code`, `search-repositories`) — how production codebases structure this; common pitfalls
+- **btca** (`listResources`, `ask`) — source-level patterns in indexed codebases; ask about conventions/structure, not API signatures (optional; only when resources are flagged in UNDERSTAND)
+- **Codex** (`gpt-5-codex`) — second-engine evaluation in EVALUATE
+
+## Dual-engine standard
+
+Where this skill calls the `codex` MCP tool, use `model: gpt-5-codex`, `sandbox: read-only`, `cwd:` the repo root. Treat Codex as **unavailable** if the call throws/times out or returns empty/non-JSON/MCP-error text (e.g. `"Codex CLI Not Found"`) — then proceed Claude-only.
+
 ## State Persistence
 
 All planning artifacts are persisted to enable plan-to-review linkage:
@@ -29,10 +43,11 @@ All planning artifacts are persisted to enable plan-to-review linkage:
 ```
 plans/{slug}/
   state.json          # phase, timestamp, selected approach
-  approaches.json     # the 3 approaches with evidence
+  approaches.json     # the candidate approaches with evidence
   claude-eval.json    # Claude's evaluation
   codex-eval.json     # Codex's evaluation (or skip marker)
   merged-eval.json    # merged evaluation result
+  plan-review.json    # multi-agent critique of the selected plan
 ```
 
 Generate slug from feature name: lowercase, hyphens for spaces, strip special chars, truncate to 50 chars.
@@ -41,7 +56,7 @@ Generate slug from feature name: lowercase, hyphens for spaces, strip special ch
 ```json
 {
   "feature": "description",
-  "phase": "UNDERSTAND|RESEARCH|FORMULATE|EVALUATE|PRESENT|SELECTED",
+  "phase": "UNDERSTAND|RESEARCH|FORMULATE|EVALUATE|PRESENT|SELECTED|REVIEW-PLAN",
   "timestamp": "ISO-8601",
   "selectedApproach": null
 }
@@ -49,23 +64,7 @@ Generate slug from feature name: lowercase, hyphens for spaces, strip special ch
 
 ## The Process
 
-```dot
-digraph planning {
-    rankdir=TB;
-    "UNDERSTAND" [shape=box];
-    "RESEARCH" [shape=box];
-    "FORMULATE" [shape=box];
-    "EVALUATE" [shape=box, style=bold];
-    "PRESENT" [shape=box];
-    "SELECTED" [shape=diamond];
-
-    "UNDERSTAND" -> "RESEARCH";
-    "RESEARCH" -> "FORMULATE";
-    "FORMULATE" -> "EVALUATE";
-    "EVALUATE" -> "PRESENT";
-    "PRESENT" -> "SELECTED";
-}
-```
+`UNDERSTAND → RESEARCH → FORMULATE → EVALUATE → PRESENT → SELECTED → REVIEW-PLAN`
 
 ### UNDERSTAND
 
@@ -108,7 +107,7 @@ If the btca MCP tools are available (`listResources`, `ask`):
 
 ### RESEARCH
 
-**All three core sources are REQUIRED. Do them in parallel using subagents. btca is a fourth optional source when resources were flagged in UNDERSTAND.**
+Gather evidence from the **Suggested research tools** (see top) that fit the problem — you decide which and how many. Run them in parallel using subagents, and add others (reading the codebase directly) as warranted. Ground approaches in real evidence, not guesses. Planning-specific usage of each:
 
 #### Context7: Current Library Docs
 ```
@@ -143,13 +142,13 @@ Only run this subagent if `state.json` has `btcaResources` flagged from the UNDE
 3. Note: answers are grounded in actual source code, not documentation
 ```
 
-If btca `ask` fails or returns no useful results, continue without it — the three core sources are sufficient.
+If btca `ask` fails or returns no useful results, continue without it.
 
 Update `state.json` with `phase: "RESEARCH"`.
 
 ### FORMULATE
 
-Formulate exactly 3 approaches. Three is deliberate: fewer than 3 risks anchoring on one idea; more than 3 overwhelms decision-making without adding clarity. Three forces you to find a genuinely distinct middle-ground option beyond the obvious "simple vs. complex" dichotomy.
+Formulate a set of genuinely distinct approaches — enough to give the user a real choice, as many as the problem warrants. Avoid a false "simple vs. complex" binary; surface meaningfully different options.
 
 For each approach, provide:
 
@@ -220,21 +219,11 @@ Write to `plans/{slug}/claude-eval.json`.
 
 **Step 2 — Codex evaluation via MCP:**
 
-Call the `codex` MCP tool with these exact parameters:
-- `prompt`: Include the contents of `approaches.json` and ask Codex to evaluate each approach for feasibility, risks, strengths, and implementation notes. Instruct it to return the same evaluation JSON format with `"engine": "codex"`. Use `@` file references (e.g., `@package.json`, `@tsconfig.json`) — these must be repo-relative paths resolved via `cwd`.
-- `model`: `gpt-5-codex`
-- `sandbox`: `read-only`
-- `cwd`: the repository root (run `git rev-parse --show-toplevel` if not already known)
+Call the `codex` MCP tool per the **dual-engine standard** (see top), with `prompt`: include the contents of `approaches.json` and ask Codex to evaluate each approach for feasibility, risks, strengths, and implementation notes, returning the same evaluation JSON with `"engine": "codex"`. Use `@` repo-relative file references (e.g. `@package.json`, `@tsconfig.json`) resolved via `cwd`.
 
-**Validate the response before writing.** Treat ALL of the following as Codex-unavailable:
-- Tool call throws or times out
-- Response is empty or whitespace-only
-- Response is not valid JSON matching the requested schema
-- Response contains MCP error text (e.g., `"Codex CLI Not Found"`, `"Codex Execution Error"`)
+If valid, write it to `plans/{slug}/codex-eval.json`.
 
-If valid, write Codex response to `plans/{slug}/codex-eval.json`.
-
-If Codex is unavailable (any condition above), write a skip marker:
+If unavailable, write a skip marker:
 ```json
 {"engine": "codex", "status": "skipped — codex MCP unavailable"}
 ```
@@ -288,7 +277,7 @@ Update `state.json` with `phase: "EVALUATE"`.
 
 ### PRESENT
 
-Present all 3 approaches to the user with:
+Present the candidate approaches to the user with:
 1. The original evidence from RESEARCH
 2. The cross-validated evaluation from EVALUATE (merged-eval.json)
 3. Highlight where engines agreed (strong signal) or disagreed (flag for human decision)
@@ -299,7 +288,28 @@ State your recommendation, incorporating merge confidence. Wait for user selecti
 
 Record the user's choice:
 - Update `state.json` with `phase: "SELECTED"` and `selectedApproach: N`
-- Proceed with implementation
+- Proceed to REVIEW-PLAN before writing code
+
+### REVIEW-PLAN
+
+Once the plan is assembled (an approach is selected), stress-test it with the **multi-agent approach** — Claude and Codex independently critique the plan before any code is written. This catches gaps the comparative EVALUATE step doesn't: an approach can win the comparison yet still ship with unaddressed risks.
+
+Scale the depth to the plan's complexity: a small, well-specified plan needs only a quick Claude sanity pass; reserve the full dual-engine critique for genuinely complex or risky work, where reflection pays off (it adds little on trivial, well-understood plans).
+
+**Step 1 — Claude critique.** Review the selected approach against the project context (read `approaches.json`, `merged-eval.json`, and relevant project files). Draw on whichever lenses fit — you decide what's worth probing:
+- **Gaps** — missing considerations, unhandled cases, undefined behavior the plan glosses over
+- **Risks & failure modes** — what could go wrong during or after implementation; migration/rollout hazards
+- **Feasibility** — does the plan fit the actual codebase, constraints, and dependencies?
+- **Over- / under-engineering** — is the scope proportionate to the problem?
+- **Testability & sequencing** — can it be built and verified incrementally?
+
+**Step 2 — Codex cross-validation.** Call the `codex` MCP tool per the **dual-engine standard** (see top), passing the selected approach plus `@` repo-relative references to key project files, and ask it to critique the plan for the same concerns, returning JSON findings (`severity`, `confidence`, `issue`, `recommendation`, `category`). If Codex is unavailable, proceed Claude-only.
+
+**Step 3 — Merge & surface.** Merge per AGREE/CHALLENGE/COMPLEMENT — surface engine *disagreements* prominently (that's where cross-model review pays off), and treat agreement as moderate, not decisive. Write `plans/{slug}/plan-review.json` and update `state.json` with `phase: "REVIEW-PLAN"`. Present the concerns to the user:
+- If critical gaps/risks surface, offer to revise the plan (loop back to FORMULATE/EVALUATE) before implementing.
+- Otherwise, summarize the concerns to keep in mind and proceed with implementation.
+
+**Replan on failure.** A plan rarely survives first contact with the code. If implementation hits a wall the plan didn't anticipate (wrong assumption, infeasible step, discovered constraint), stop and loop back to FORMULATE/EVALUATE with what you learned rather than forcing the original plan through.
 
 ## Plan-to-Review Linkage
 
@@ -307,32 +317,6 @@ The `core:review-code` agent can read `plans/{slug}/approaches.json` and `state.
 
 ## Red Flags
 
-**Never:**
-- Skip MCP research and guess at approaches
-- Present approaches without evidence from real sources
-- Start implementation before user selects an approach
-- Present fewer than 3 or more than 3 approaches
-- Use only one MCP source (all three required)
-- Skip the EVALUATE phase even if Codex is unavailable (Claude-only eval still adds value)
+Never: guess approaches without evidence; present hypothetical (non-sourced) approaches; collapse the options into a single recommendation before the user has chosen; start implementation before the user selects and the plan clears REVIEW-PLAN; skip EVALUATE or REVIEW-PLAN even when Codex is unavailable (Claude-only still adds value).
 
-**If MCP is unavailable:**
-- Note which source is missing
-- Use WebSearch as fallback for that source
-- Still present 3 evidence-backed approaches
-
-**If Codex is unavailable:**
-- Claude-only evaluation proceeds normally
-- Merged eval passes through Claude eval with `enginesUsed: ["claude"]`
-- Status message: "Codex not available — Claude-only evaluation."
-
-## Quality Checklist
-
-- [ ] All three core MCP sources consulted (Context7, Serper, GitHub)
-- [ ] btca consulted if resources were flagged in UNDERSTAND (optional)
-- [ ] Exactly 3 approaches with concrete trade-offs
-- [ ] Each approach cites real evidence (not hypothetical)
-- [ ] EVALUATE phase completed (merged-eval.json exists)
-- [ ] Cross-validation results shown to user
-- [ ] Recommendation stated with reasoning
-- [ ] User selected approach before implementation began
-- [ ] `plans/{slug}/state.json` records selected approach
+If a resource is unavailable, note the gap and fall back (e.g. WebSearch) — still deliver evidence-backed approaches. If Codex is unavailable, proceed with Claude-only eval (`enginesUsed: ["claude"]`).
