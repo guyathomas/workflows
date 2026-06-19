@@ -48,6 +48,7 @@ plans/{slug}/
   codex-eval.json     # Codex's evaluation (or skip marker)
   merged-eval.json    # merged evaluation result
   plan-review.json    # multi-agent critique of the selected plan
+  prd.md              # destination doc: goal, approach, TDD-gated build plan
 ```
 
 Generate slug from feature name: lowercase, hyphens for spaces, strip special chars, truncate to 50 chars.
@@ -56,7 +57,7 @@ Generate slug from feature name: lowercase, hyphens for spaces, strip special ch
 ```json
 {
   "feature": "description",
-  "phase": "UNDERSTAND|RESEARCH|FORMULATE|EVALUATE|PRESENT|SELECTED|REVIEW-PLAN",
+  "phase": "UNDERSTAND|RESEARCH|FORMULATE|EVALUATE|PRESENT|SELECTED|REVIEW-PLAN|BUILD-PLAN",
   "timestamp": "ISO-8601",
   "selectedApproach": null
 }
@@ -64,7 +65,7 @@ Generate slug from feature name: lowercase, hyphens for spaces, strip special ch
 
 ## The Process
 
-`UNDERSTAND → RESEARCH → FORMULATE → EVALUATE → PRESENT → SELECTED → REVIEW-PLAN`
+`UNDERSTAND → RESEARCH → FORMULATE → EVALUATE → PRESENT → SELECTED → REVIEW-PLAN → BUILD-PLAN`
 
 ### UNDERSTAND
 
@@ -306,10 +307,49 @@ Scale the depth to the plan's complexity: a small, well-specified plan needs onl
 **Step 2 — Codex cross-validation.** Call the `codex` MCP tool per the **dual-engine standard** (see top), passing the selected approach plus `@` repo-relative references to key project files, and ask it to critique the plan for the same concerns, returning JSON findings (`severity`, `confidence`, `issue`, `recommendation`, `category`). If Codex is unavailable, proceed Claude-only.
 
 **Step 3 — Merge & surface.** Merge per AGREE/CHALLENGE/COMPLEMENT — surface engine *disagreements* prominently (that's where cross-model review pays off), and treat agreement as moderate, not decisive. Write `plans/{slug}/plan-review.json` and update `state.json` with `phase: "REVIEW-PLAN"`. Present the concerns to the user:
-- If critical gaps/risks surface, offer to revise the plan (loop back to FORMULATE/EVALUATE) before implementing.
-- Otherwise, summarize the concerns to keep in mind and proceed with implementation.
+- If critical gaps/risks surface, offer to revise the plan (loop back to FORMULATE/EVALUATE).
+- Otherwise, summarize the concerns to keep in mind and ask the user to confirm the plan before proceeding to BUILD-PLAN. Don't decompose a plan the user hasn't blessed.
 
 **Replan on failure.** A plan rarely survives first contact with the code. If implementation hits a wall the plan didn't anticipate (wrong assumption, infeasible step, discovered constraint), stop and loop back to FORMULATE/EVALUATE with what you learned rather than forcing the original plan through.
+
+### BUILD-PLAN
+
+Turn the reviewed approach into a destination document the implementer (or an autonomous loop) executes gate by gate. Output a single `prd.md` — a summary of the shared understanding already reached, plus an ordered set of gates. You usually won't need to re-read it.
+
+Detect the project's quality commands once, up front: read `package.json` scripts (or the repo's Makefile/CI config) for the real lint, format, test, and build commands. Record them in `prd.md` so every gate references the same ones.
+
+Break the work into the fewest gates that each deliver a working vertical slice — small enough to fit one context window (keep tasks small). Every gate is TDD-gated: it opens by writing failing tests and closes only when lint, format, test, and build all pass.
+
+Write `plans/{slug}/prd.md`:
+
+```markdown
+# {Feature}
+
+## Goal
+[2-3 sentences — the shared understanding from UNDERSTAND.]
+
+## Selected approach
+[1-2 sentences; references approach N in approaches.json.]
+
+## Quality commands
+- Lint: `<cmd>`
+- Format: `<cmd>`
+- Test: `<cmd>`
+- Build: `<cmd>`
+
+## Gates
+Execute in order. Do not start a gate until the previous gate's exit criteria are green.
+
+### Gate 1: [name]
+**Red (tests first):** the failing tests that define "done" for this slice.
+**Green:** the minimum implementation to pass them.
+**Exit criteria:** lint, format, test, build all pass.
+
+### Gate 2: [name]
+...
+```
+
+Update `state.json` with `phase: "BUILD-PLAN"`. Present the gate list to the user before implementation begins.
 
 ## Plan-to-Review Linkage
 
@@ -317,6 +357,6 @@ The `core:review-code` agent can read `plans/{slug}/approaches.json` and `state.
 
 ## Red Flags
 
-Never: guess approaches without evidence; present hypothetical (non-sourced) approaches; collapse the options into a single recommendation before the user has chosen; start implementation before the user selects and the plan clears REVIEW-PLAN; skip EVALUATE or REVIEW-PLAN even when Codex is unavailable (Claude-only still adds value).
+Never: guess approaches without evidence; present hypothetical (non-sourced) approaches; collapse the options into a single recommendation before the user has chosen; start implementation before the user selects and the plan clears REVIEW-PLAN; skip EVALUATE or REVIEW-PLAN even when Codex is unavailable (Claude-only still adds value); start a gate's implementation before its tests are red, or close a gate with lint, format, test, or build failing.
 
 If a resource is unavailable, note the gap and fall back (e.g. WebSearch) — still deliver evidence-backed approaches. If Codex is unavailable, proceed with Claude-only eval (`enginesUsed: ["claude"]`).

@@ -176,6 +176,9 @@ Report as suggestions in a summary table:
 ```
 
 If no findings above confidence threshold: report "Review complete — no issues found."
+
+### Persist the summary
+Write the same summary (fixed, suggestions, disagreements, stale docs, missing tests) to `reviews/{branch}.md`, where `{branch}` is `git rev-parse --abbrev-ref HEAD`. Re-reviewing the same branch overwrites it. This keeps deferred medium/low findings from evaporating when the chat scrolls, and gives the standalone `review-code` agent a record to read alongside `plans/{slug}/`.
 </phase>
 
 </workflow>
