@@ -115,7 +115,7 @@ After your Claude review, get a second opinion from Codex and merge.
 <phase name="AGGREGATE">
 1. Collect JSON responses from all reviewer teammates
 2. Parse each response (if malformed, skip with warning)
-3. **Filter:** Remove findings with `confidence < 80`
+3. **Filter (judgment, not a numeric gate):** Drop findings that lack a concrete triggering scenario or a clear cause — not findings that merely score below a number. Self-reported confidence is poorly calibrated, so treat it as a weak tiebreaker; rank by scenario quality and cross-validation status instead. A low score on a finding with a precise, cross-validated failure scenario is worth more than a high score with none.
 4. **Group by severity** from teammate outputs:
    - **Critical** — Must fix before proceeding
    - **High** — Should fix now
@@ -135,6 +135,8 @@ For each critical/high finding:
 1. Read the file at the specified line
 2. Apply the recommendation to fix the issue
 3. Report what was fixed
+
+After applying the fixes, run the project's quality gate (the lint/typecheck/test scripts the repo already uses — e.g. `npm run lint`/`test`, `tsc --noEmit`, `cargo clippy`). If something breaks, report which fix likely caused it and let the user decide whether to keep, adjust, or revert — don't auto-revert, and don't block on failures that were already red before the review.
 
 ### Medium and Low findings
 Report as suggestions in a summary table:

@@ -296,7 +296,7 @@ Once the plan is assembled (an approach is selected), stress-test it with the **
 
 Scale the depth to the plan's complexity: a small, well-specified plan needs only a quick Claude sanity pass; reserve the full dual-engine critique for genuinely complex or risky work, where reflection pays off (it adds little on trivial, well-understood plans).
 
-**Step 1 — Claude critique.** Review the selected approach against the project context (read `approaches.json`, `merged-eval.json`, and relevant project files). Draw on whichever lenses fit — you decide what's worth probing:
+**Step 1 — Claude critique.** Take an explicitly adversarial stance — your job is to find why this plan *fails*, not to confirm it; an assigned "must oppose" stance surfaces materially more real gaps than a neutral "review". Review the selected approach against the project context (read `approaches.json`, `merged-eval.json`, and relevant project files), and give each objection a cited reason — a constraint, dependency, missing migration path, or sequencing risk, not just a hunch. Draw on whichever lenses fit — you decide what's worth probing:
 - **Gaps** — missing considerations, unhandled cases, undefined behavior the plan glosses over
 - **Risks & failure modes** — what could go wrong during or after implementation; migration/rollout hazards
 - **Feasibility** — does the plan fit the actual codebase, constraints, and dependencies?
