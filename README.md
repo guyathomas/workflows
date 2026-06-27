@@ -4,25 +4,33 @@ Research, planning, and code review skills for Claude Code with dual-engine cros
 
 ## What's Included
 
-### Skills (3)
+### Skills (4)
 
 - **research** — Deep research with 20+ sources and confidence tracking, powered by agent teams with Codex cross-validation
-- **planning** — Pre-implementation planning that researches approaches using Context7, Serper, GitHub MCPs, and optionally btca for source-level codebase research, with dual-engine evaluation via Codex MCP. Once an approach is selected, a multi-agent (Claude + Codex) REVIEW-PLAN step stress-tests the plan for gaps and risks, then a BUILD-PLAN step writes a PRD broken into TDD-gated vertical slices — each gate opens with failing tests and closes only when lint, format, test, and build pass — before any code is written.
+- **planning** — Pre-implementation planning that researches approaches using Context7, Serper, GitHub MCPs, and optionally btca for source-level codebase research, with dual-engine evaluation via Codex MCP. Once an approach is selected, a BUILD-PLAN step writes a PRD broken into TDD-gated vertical slices — each gate opens with failing tests and closes only when lint, format, test, and build pass — then a multi-agent REVIEW-PLAN step (delegating to **plan-review**) stress-tests the assembled plan before any code is written.
+- **plan-review** — Multi-reviewer critique of a *written plan* (the plan-equivalent of code-review-pipeline): four parallel dual-engine reviewers (assumptions, completeness, structure, scope) audit `plans/{slug}/prd.md`, auto-apply mechanical fixes, and gate scope/approach changes for the user. Runs at planning's REVIEW-PLAN phase or standalone via `/plan-review`.
 - **code-review-pipeline** — Multi-reviewer code review using agent teams (code, tests, docs), each cross-validated with Codex. The skill owns the dual-engine collaboration standard and the suggested-tools menu, injecting both into every reviewer.
 
-### Agents (4)
+### Agents (8)
 
-**Pipeline reviewers (3):** dispatched by the code-review-pipeline skill based on what the change needs.
+**Code pipeline reviewers (3):** dispatched by the code-review-pipeline skill based on what the change needs.
 - **code** — the generalist: bugs, logic, security, error handling, structure (coupling/cohesion/API surface), and framework best-practices in one pass
 - **tests** — coverage gaps, test antipatterns, missing cases
 - **docs** — documentation staleness
 
+**Plan reviewers (4):** dispatched by the plan-review skill — all four run on every plan.
+- **review-plan-assumptions** — load-bearing assumptions (verified vs. guessed), codebase fit, evidence freshness
+- **review-plan-completeness** — gap sweep, non-functional coverage (migration/rollback/observability/auth/perf/flags), per-gate definition-of-done
+- **review-plan-structure** — gate dependency ordering, vertical-slice integrity, right-sizing, real RED tests
+- **review-plan-scope** — scope drift vs. the original ask, over/under-engineering, simpler alternatives
+
 **Standalone reviewer (1):** **review-code** — reviews completed work against the original plan and coding standards. Invoked via `/review-code`; carries its own self-contained cross-validation since it runs outside the pipeline.
 
-### Commands (4)
+### Commands (5)
 
 - `/research` — Start a deep research session
 - `/planning` — Plan a non-trivial feature before implementation
+- `/plan-review` — Stress-test a written plan with parallel dual-engine reviewers
 - `/code-review-pipeline` — Run the full review pipeline
 - `/review-code` — Standalone plan-alignment + standards review
 
