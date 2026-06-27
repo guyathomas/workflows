@@ -57,7 +57,7 @@ Generate slug from feature name: lowercase, hyphens for spaces, strip special ch
 ```json
 {
   "feature": "description",
-  "phase": "UNDERSTAND|RESEARCH|FORMULATE|EVALUATE|PRESENT|SELECTED|REVIEW-PLAN|BUILD-PLAN",
+  "phase": "UNDERSTAND|RESEARCH|FORMULATE|EVALUATE|PRESENT|SELECTED|BUILD-PLAN|REVIEW-PLAN",
   "timestamp": "ISO-8601",
   "selectedApproach": null
 }
@@ -65,7 +65,9 @@ Generate slug from feature name: lowercase, hyphens for spaces, strip special ch
 
 ## The Process
 
-`UNDERSTAND → RESEARCH → FORMULATE → EVALUATE → PRESENT → SELECTED → REVIEW-PLAN → BUILD-PLAN`
+`UNDERSTAND → RESEARCH → FORMULATE → EVALUATE → PRESENT → SELECTED → BUILD-PLAN → REVIEW-PLAN`
+
+The full multi-agent plan critique runs **last**, on the assembled `prd.md` — gate-level lenses (dependency ordering, vertical-slice, right-sizing, real RED tests) need the gates to exist first. A lightweight sanity pass at SELECTED guards against decomposing an obviously-doomed approach.
 
 ### UNDERSTAND
 
@@ -289,32 +291,12 @@ State your recommendation, incorporating merge confidence. Wait for user selecti
 
 Record the user's choice:
 - Update `state.json` with `phase: "SELECTED"` and `selectedApproach: N`
-- Proceed to REVIEW-PLAN before writing code
 
-### REVIEW-PLAN
-
-Once the plan is assembled (an approach is selected), stress-test it with the **multi-agent approach** — Claude and Codex independently critique the plan before any code is written. This catches gaps the comparative EVALUATE step doesn't: an approach can win the comparison yet still ship with unaddressed risks.
-
-Scale the depth to the plan's complexity: a small, well-specified plan needs only a quick Claude sanity pass; reserve the full dual-engine critique for genuinely complex or risky work, where reflection pays off (it adds little on trivial, well-understood plans).
-
-**Step 1 — Claude critique.** Review the selected approach against the project context (read `approaches.json`, `merged-eval.json`, and relevant project files). Draw on whichever lenses fit — you decide what's worth probing:
-- **Gaps** — missing considerations, unhandled cases, undefined behavior the plan glosses over
-- **Risks & failure modes** — what could go wrong during or after implementation; migration/rollout hazards
-- **Feasibility** — does the plan fit the actual codebase, constraints, and dependencies?
-- **Over- / under-engineering** — is the scope proportionate to the problem?
-- **Testability & sequencing** — can it be built and verified incrementally?
-
-**Step 2 — Codex cross-validation.** Call the `codex` MCP tool per the **dual-engine standard** (see top), passing the selected approach plus `@` repo-relative references to key project files, and ask it to critique the plan for the same concerns, returning JSON findings (`severity`, `confidence`, `issue`, `recommendation`, `category`). If Codex is unavailable, proceed Claude-only.
-
-**Step 3 — Merge & surface.** Merge per AGREE/CHALLENGE/COMPLEMENT — surface engine *disagreements* prominently (that's where cross-model review pays off), and treat agreement as moderate, not decisive. Write `plans/{slug}/plan-review.json` and update `state.json` with `phase: "REVIEW-PLAN"`. Present the concerns to the user:
-- If critical gaps/risks surface, offer to revise the plan (loop back to FORMULATE/EVALUATE).
-- Otherwise, summarize the concerns to keep in mind and ask the user to confirm the plan before proceeding to BUILD-PLAN. Don't decompose a plan the user hasn't blessed.
-
-**Replan on failure.** A plan rarely survives first contact with the code. If implementation hits a wall the plan didn't anticipate (wrong assumption, infeasible step, discovered constraint), stop and loop back to FORMULATE/EVALUATE with what you learned rather than forcing the original plan through.
+**Light sanity pass before decomposing.** Run one quick Claude check on the selected approach against the codebase: is it obviously infeasible (names a module/API that doesn't exist, contradicts a hard constraint)? This is cheap insurance so BUILD-PLAN doesn't decompose a doomed approach. If it trips, loop back to FORMULATE/EVALUATE. The full multi-agent critique comes later, in REVIEW-PLAN. Otherwise proceed to BUILD-PLAN.
 
 ### BUILD-PLAN
 
-Turn the reviewed approach into a destination document the implementer (or an autonomous loop) executes gate by gate. Output a single `prd.md` — a summary of the shared understanding already reached, plus an ordered set of gates. You usually won't need to re-read it.
+Turn the selected approach into a destination document the implementer (or an autonomous loop) executes gate by gate. Output a single `prd.md` — a summary of the shared understanding already reached, plus an ordered set of gates. You usually won't need to re-read it.
 
 Detect the project's quality commands once, up front: read `package.json` scripts (or the repo's Makefile/CI config) for the real lint, format, test, and build commands. Record them in `prd.md` so every gate references the same ones.
 
@@ -349,7 +331,22 @@ Execute in order. Do not start a gate until the previous gate's exit criteria ar
 ...
 ```
 
-Update `state.json` with `phase: "BUILD-PLAN"`. Present the gate list to the user before implementation begins.
+Update `state.json` with `phase: "BUILD-PLAN"`. Proceed to REVIEW-PLAN before presenting the plan as final — don't ship gates that haven't been stress-tested.
+
+### REVIEW-PLAN
+
+Stress-test the assembled `prd.md` (approach + gates together) with the **multi-agent plan critique** before any code is written. An approach can win EVALUATE yet still ship with unverified assumptions, missing non-functional work, out-of-order gates, or quiet scope creep — this phase catches that.
+
+**Delegate to the `plan-review` skill** on `plans/{slug}/`. It dispatches four parallel dual-engine reviewers (assumptions, completeness, structure, scope), aggregates by severity, **auto-applies mechanical fixes** to `prd.md`, and **gates scope/approach changes** for your decision. It writes `plans/{slug}/plan-review.json` and converges (re-review until build-ready, max 2 rounds).
+
+Scale to complexity: a small, well-specified plan may only need a quick pass; the four-reviewer team earns its cost on genuinely complex or risky work. Either way, run it through `plan-review` so the apply/confirm split and assumption ledger are consistent.
+
+After it returns, update `state.json` with `phase: "REVIEW-PLAN"` and:
+- Resolve every `pendingConfirm` finding with the user. If one invalidates the approach, loop back to FORMULATE/EVALUATE.
+- Surface the `guessedAssumptions` ledger as pre-build verification tasks.
+- Present the final gate list only once the plan is `buildReady`. Don't decompose or rewrite a plan's intent the user hasn't blessed.
+
+**Replan on failure.** A plan rarely survives first contact with the code. If implementation hits a wall the plan didn't anticipate (wrong assumption, infeasible step, discovered constraint), stop and loop back to FORMULATE/EVALUATE with what you learned rather than forcing the original plan through.
 
 ## Plan-to-Review Linkage
 
