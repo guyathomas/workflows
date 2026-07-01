@@ -41,7 +41,7 @@ Don't use when:
 | `.ts, .js, .py, .rs, .go` | code, test, docs |
 | Changed public API, config, env vars, CLI flags | docs |
 
-The `code` reviewer is the generalist — it covers correctness (bugs, logic, security, error handling), structure (coupling, cohesion, API surface), and framework best-practices in one pass. Dispatch it for any non-trivial code change.
+The `code` reviewer is the generalist — it covers correctness (bugs, logic, security, error handling), structure (coupling, cohesion, API surface), framework best-practices, and accessibility (a11y) for UI changes in one pass. Dispatch it for any non-trivial code change.
 
 6. Deduplicate into the set of reviewers to dispatch
 </phase>
