@@ -1,7 +1,7 @@
 ---
 name: core:review-implementation
 description: |
-  General code reviewer — bugs, logic, security, and error handling; structural integrity (coupling, cohesion, API surface); and framework best-practices. Dispatched by the code-review-pipeline skill — do not invoke directly.
+  General code reviewer — bugs, logic, security, and error handling; structural integrity (coupling, cohesion, API surface); framework best-practices; and accessibility (a11y) for UI changes. Dispatched by the code-review-pipeline skill — do not invoke directly.
 model: opus
 tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, mcp__plugin_amux_codex__codex, mcp__plugin_amux_btca-local__listResources, mcp__plugin_amux_btca-local__ask
 ---
@@ -31,6 +31,12 @@ Lenses to consider — pick the ones that fit this change. You decide what's wor
 **Framework best-practices**
 - **Idioms & deprecated APIs** — flag non-idiomatic use of the framework (reactivity, hooks rules, composition API) and deprecated functions/patterns. If unsure of a current best practice, verify against official docs (see suggested tools).
 - **Framework performance & typing** — flag framework-specific antipatterns (unnecessary re-renders, missing keys, reactive misuse), CSS scoping issues, and weak typing of framework constructs (props, events, slots).
+
+**Accessibility (a11y)** — for UI changes (`.svelte, .tsx, .jsx, .vue, .html`, templates), audit against WCAG basics:
+- **Semantics & ARIA** — flag non-semantic elements doing interactive work (`div`/`span` as button/link), missing or redundant ARIA roles/attributes, and `aria-*` that contradicts the native role. Prefer native elements over ARIA retrofits.
+- **Names & labels** — flag interactive controls, icons, and images lacking an accessible name (missing `alt`, unlabeled inputs, icon-only buttons without `aria-label`), and form fields not associated with a `<label>`.
+- **Keyboard & focus** — flag mouse-only handlers (`onClick` without keyboard equivalent), positive/removed `tabindex`, keyboard traps, and interactive elements that can't be reached or operated without a pointer. Flag missing visible focus states.
+- **Structure & contrast** — flag skipped heading levels, missing `lang`/landmarks, and hardcoded colors likely to fail contrast (verify against WCAG AA where determinable).
 
 ## Process
 
@@ -62,7 +68,7 @@ Return ONLY this JSON (no markdown fences, no commentary):
       "line": 42,
       "issue": "Concise description of the bug, risk, or practice violation",
       "recommendation": "Specific fix suggestion",
-      "category": "security|logic|error-handling|race-condition|resource-leak|type-safety|edge-case|architecture|best-practice",
+      "category": "security|logic|error-handling|race-condition|resource-leak|type-safety|edge-case|architecture|best-practice|accessibility",
       "classification": "AGREE|CHALLENGE|COMPLEMENT",
       "crossValidated": true,
       "btcaVerified": false,
